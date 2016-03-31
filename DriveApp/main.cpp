@@ -5,84 +5,57 @@
 
 #include <curl/curl.h>
 #include "json/json.h"
-#include "tcp_communicator\tcp_communicator.h"
+#include "tcp_communicator/tcp_communicator.h"
 #include "curl_cpp/curl.h"
 
 // input is json file from Google API
 // https://developers.google.com/identity/protocols/OAuth2InstalledApp
 // https://developers.google.com/drive/v3/web/about-auth
 
+
+int local_port_number;
 std::string GetAuthorizationCode(const std::string& auth_url, const std::string& client_id)
 {
-    
+	
     std::string url = auth_url;    
     url += std::string("?scope=") + "https://www.googleapis.com/auth/drive"; // scope (our permissions)
     url += "&response_type=code";
     url += std::string("&client_id=") + client_id;
-    // url += "&redirect_uri=urn:ietf:wg:oauth:2.0:oob"; // prompt user to enter code
-    url += "&redirect_uri=http://localhost:3537"; // prompt user to enter code
-
+    
+	Tcp_communicator tcp{};
+	
+	//url += "&redirect_uri=http://localhost:3537"; // prompt user to enter code
+	url += "&redirect_uri=http://localhost:"; // prompt user to enter code
+	url += std::to_string(tcp.get_port_number());
+	local_port_number = tcp.get_port_number();
     std::wstring wurl(url.begin(), url.end());
+
+	
 
     ShellExecute(NULL, L"open", wurl.c_str(), NULL, NULL, SW_SHOWNORMAL);
 
 
-    ADDRINFOA *result = nullptr;
-    ADDRINFOA *ptr = nullptr;
+	tcp.set_timeout(10);
+	if (!tcp.accept_connection())
+	{
+		std::cerr << "Timeout" << std::endl;
+		std::abort();
+	}
+	std::vector<byte> raw_data = tcp.get_data();
 
-    ADDRINFOA hints{};
-    hints.ai_family = AF_UNSPEC;
-    hints.ai_socktype = SOCK_STREAM;
-    hints.ai_protocol = IPPROTO_TCP;
+	static_assert(sizeof(byte) == sizeof(char), "Size of char != size of byte");
+	std::string request(reinterpret_cast<char*>(raw_data.data()), raw_data.size());
+	tcp.send_data("HTTP / 1.1 200 OK\r\nContent - Type: text / html\r\nContent - Length: 37\r\n\r\nThank you!You can close the browser.");
+	tcp.close_connection();
 
-    // Resolve the server address and port
-    int res = getaddrinfo("127.0.0.1", "3537", &hints, &result);
-    if (res != 0)
-    {
-        throw std::runtime_error((std::string("getaddrinfo failed with error: ") + std::to_string(res)).c_str());
-    }
+	
 
-    SOCKET sock = NULL;
-    // Attempt to connect to an address until one succeeds
-    for (ptr = result; ptr != nullptr; ptr = ptr->ai_next)
-    {
-        // Create a SOCKET for connecting to server
-        sock = socket(ptr->ai_family, ptr->ai_socktype, ptr->ai_protocol);
-    }
-
-    // Connect to server.
-    sockaddr_in service;
-    service.sin_family = AF_INET;
-    service.sin_addr.s_addr = inet_addr("127.0.0.1");
-    service.sin_port = htons(3537);
-
-    if (bind(sock,
-        (SOCKADDR *)& service, sizeof(service)) == SOCKET_ERROR) {
-        wprintf(L"bind failed with error: %ld\n", WSAGetLastError());
-    }
-
-    if (listen(sock, 1) == SOCKET_ERROR) {
-        wprintf(L"listen failed with error: %ld\n", WSAGetLastError());
-    }
-
-    SOCKET AcceptSocket = accept(sock, NULL, NULL);
-
-    char recvbuf[2048];
-    int iResult = recv(AcceptSocket, recvbuf, sizeof(recvbuf), 0);
-
-    std::string response = "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nContent-Length: 37\r\n\r\nThank you! You can close the browser.";
-    send(AcceptSocket, response.c_str(), response.size(), 0);
-
-    closesocket(sock);
-
-    freeaddrinfo(result);
-
-    std::string request(recvbuf, iResult);
     request.erase(request.find('\r'), std::string::npos);
-    // GET /?code=4/Kmh-xmTb-QCFrWmYcUKGHY54wBBgM4crsibZ_StR6a0 HTTP/1.1
+    
     request.erase(0, 11);
     request.erase(request.size() - 9, std::string::npos);
 
+	
     return request;
 }
 
@@ -99,7 +72,7 @@ Json::Value Authenticate(const std::string& authorization_code, const std::strin
     post << "code=" << authorization_code << "&"
         << "client_id=" << client_id << "&"
         << "client_secret=" << client_secret << "&"
-        << "redirect_uri=http://localhost:3537&"
+        << "redirect_uri=http://localhost:" << local_port_number << "&"
         << "grant_type=authorization_code";
 
     std::string post_str = post.str();
