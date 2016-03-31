@@ -6,6 +6,7 @@
 #include <curl/curl.h>
 #include "json/json.h"
 #include "tcp_communicator\tcp_communicator.h"
+#include "curl_cpp/curl.h"
 
 // input is json file from Google API
 // https://developers.google.com/identity/protocols/OAuth2InstalledApp
@@ -22,10 +23,9 @@ std::string GetAuthorizationCode(const std::string& auth_url, const std::string&
     url += "&redirect_uri=http://localhost:3537"; // prompt user to enter code
 
     std::wstring wurl(url.begin(), url.end());
-	//ShellExecute(0, L"open", L"www.microsoft.com", 0, 0, 1);
-	std::cout << url.c_str() << std::endl;
+
     ShellExecute(NULL, L"open", wurl.c_str(), NULL, NULL, SW_SHOWNORMAL);
-	ShellExecuteA(0, 0, url.c_str(), 0, 0, SW_SHOW);
+
 
     ADDRINFOA *result = nullptr;
     ADDRINFOA *ptr = nullptr;
@@ -105,25 +105,15 @@ Json::Value Authenticate(const std::string& authorization_code, const std::strin
     std::string post_str = post.str();
     std::string token_uri = "https://accounts.google.com/o/oauth2/token";
 
-    CURL* curl = curl_easy_init();
-    curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, false);
-    curl_easy_setopt(curl, CURLOPT_URL, token_uri.c_str());
-    curl_easy_setopt(curl, CURLOPT_CUSTOMREQUEST, "POST");
-
-    curl_easy_setopt(curl, CURLOPT_POSTFIELDS, post_str.c_str());
-    curl_easy_setopt(curl, CURLOPT_POSTFIELDSIZE, post_str.size());
-
-    std::vector<char> response;
-    curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, WriteVectorCallback);
-    curl_easy_setopt(curl, CURLOPT_WRITEDATA, (void *)&response);
-
-    CURLcode ret = curl_easy_perform(curl);
-
-    int http_code;
-    curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &http_code);
-
-    curl_easy_cleanup(curl);
-
+    
+	Curl curl{};
+	curl.use_ssl(false).set_url(token_uri).set_type(Curl::Request_type::post);
+    
+	std::vector<char> response;
+	
+    int http_code = curl.send(post.str(), response);;
+	std::cout << "Authenticate - " << http_code << std::endl;
+	
     Json::Reader reader;
 
     Json::Value ret_val;
@@ -142,26 +132,15 @@ Json::Value RefreshToken(const std::string& refresh_token, const std::string& cl
     std::string post_str = post.str();
     std::string token_uri = "https://www.googleapis.com/oauth2/v4/token";
 
-    CURL* curl = curl_easy_init();
-    curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, false);
-    curl_easy_setopt(curl, CURLOPT_URL, token_uri.c_str());
-    curl_easy_setopt(curl, CURLOPT_CUSTOMREQUEST, "POST");
-
-    curl_easy_setopt(curl, CURLOPT_POSTFIELDS, post_str.c_str());
-    curl_easy_setopt(curl, CURLOPT_POSTFIELDSIZE, post_str.size());
-
-    std::vector<char> response;
-    curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, WriteVectorCallback);
-    curl_easy_setopt(curl, CURLOPT_WRITEDATA, (void *)&response);
-
-    CURLcode ret = curl_easy_perform(curl);
-
-    int http_code;
-    curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &http_code);
-
-    curl_easy_cleanup(curl);
-
-    Json::Reader reader;
+  
+	Curl curl{};
+	curl.use_ssl(false).set_type(Curl::Request_type::post).set_url(token_uri);
+  
+	std::vector<char> response;
+    int http_code = curl.send(post.str() , response);
+	std::cout << "Refresh token - " << http_code << std::endl;
+  
+	Json::Reader reader;
 
     Json::Value ret_val;
     reader.parse(&response[0], &response[0] + response.size(), ret_val);
@@ -227,7 +206,7 @@ int main(int argc, char* argv[])
     }
 
 	std::ifstream upload_file;
-	if (argc == 1)
+	if (argc == 1) // Get name from input
 	{
 		std::cout << "Name of file:" << std::endl;
 		std::string tmp_file_name;
@@ -236,6 +215,7 @@ int main(int argc, char* argv[])
 	}
 	else // File was dropped on executable
 		upload_file.open(argv[1]);
+
 	if (!upload_file.is_open())
 	{
 		std::cerr << "Bad file name" << std::endl;
@@ -254,32 +234,20 @@ int main(int argc, char* argv[])
 
     std::string url = "https://www.googleapis.com/upload/drive/v3/files?uploadType=media";
 
-    CURL* curl = curl_easy_init();
+	Curl curl{};
 
-    struct curl_slist *headers = NULL;
-    for (const auto& i : http_fields)
-        headers = curl_slist_append(headers, i.c_str());
-
-    curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
-
-    curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, false);
-    curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
-    curl_easy_setopt(curl, CURLOPT_CUSTOMREQUEST, "POST");
-
-    curl_easy_setopt(curl, CURLOPT_POSTFIELDS, upload_file_content.c_str());
-    curl_easy_setopt(curl, CURLOPT_POSTFIELDSIZE, upload_file_content.size());
+	for (const auto& i : http_fields)
+		curl.add_header(i);
+	curl.use_ssl(false).set_type(Curl::Request_type::post).set_url(url);
 
     std::vector<char> response;
-    curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, WriteVectorCallback);
-    curl_easy_setopt(curl, CURLOPT_WRITEDATA, (void *)&response);
 
-    CURLcode ret = curl_easy_perform(curl);
-
-    int http_code;
-    curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &http_code);
-
-    curl_slist_free_all(headers);
-    curl_easy_cleanup(curl);
-
+	int http_code = curl.send(upload_file_content, response);
+	std::cout << http_code << std::endl;
+	
+	// Wait for input
+	char c;
+	std::cin >> c;
+    
     return 0;
 }
