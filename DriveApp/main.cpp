@@ -1,18 +1,20 @@
-#include <curl/curl.h>
-
-#include "json/json.h"
-
 #include <fstream>
 #include <iostream>
 #include <vector>
 #include <regex>
 
+#include <curl/curl.h>
+#include "json/json.h"
+#include "tcp_communicator\tcp_communicator.h"
+
 // input is json file from Google API
+// https://developers.google.com/identity/protocols/OAuth2InstalledApp
+// https://developers.google.com/drive/v3/web/about-auth
+
 std::string GetAuthorizationCode(const std::string& auth_url, const std::string& client_id)
 {
-    // https://developers.google.com/identity/protocols/OAuth2InstalledApp
-    std::string url = auth_url;
-    // https://developers.google.com/drive/v3/web/about-auth
+    
+    std::string url = auth_url;    
     url += std::string("?scope=") + "https://www.googleapis.com/auth/drive"; // scope (our permissions)
     url += "&response_type=code";
     url += std::string("&client_id=") + client_id;
@@ -20,7 +22,10 @@ std::string GetAuthorizationCode(const std::string& auth_url, const std::string&
     url += "&redirect_uri=http://localhost:3537"; // prompt user to enter code
 
     std::wstring wurl(url.begin(), url.end());
+	//ShellExecute(0, L"open", L"www.microsoft.com", 0, 0, 1);
+	std::cout << url.c_str() << std::endl;
     ShellExecute(NULL, L"open", wurl.c_str(), NULL, NULL, SW_SHOWNORMAL);
+	ShellExecuteA(0, 0, url.c_str(), 0, 0, SW_SHOW);
 
     ADDRINFOA *result = nullptr;
     ADDRINFOA *ptr = nullptr;
@@ -165,7 +170,8 @@ Json::Value RefreshToken(const std::string& refresh_token, const std::string& cl
 
 int main(int argc, char* argv[])
 {
-    if (argc != 2)
+	
+    if (argc != 2 && argc != 1 )
         return 1;
 
     std::string this_dir(argv[0]);
@@ -183,12 +189,12 @@ int main(int argc, char* argv[])
     Json::Reader reader;
 
     Json::Value client_secret_json;
-    reader.parse(std::ifstream(this_dir + "client_secret.json"), client_secret_json);
+    reader.parse(std::ifstream( "client_secret.json"), client_secret_json);
 
     std::string client_id = client_secret_json["installed"]["client_id"].asString();
     std::string client_secret = client_secret_json["installed"]["client_secret"].asString();
     std::string auth_url = client_secret_json["installed"]["auth_uri"].asString();
-
+	std::cout << auth_url << std::endl;
     // read our settings
     Json::Value settings_json;
     reader.parse(std::ifstream(this_dir + "settings.json"), settings_json);
@@ -220,7 +226,22 @@ int main(int argc, char* argv[])
         token_type = refresh_token_reply["token_type"].asString();
     }
 
-    std::ifstream upload_file(argv[1]);
+	std::ifstream upload_file;
+	if (argc == 1)
+	{
+		std::cout << "Name of file:" << std::endl;
+		std::string tmp_file_name;
+		getline(std::cin, tmp_file_name);
+		upload_file.open(tmp_file_name);
+	}
+	else // File was dropped on executable
+		upload_file.open(argv[1]);
+	if (!upload_file.is_open())
+	{
+		std::cerr << "Bad file name" << std::endl;
+		std::abort();
+	}
+
     std::string upload_file_content((std::istreambuf_iterator<char>(upload_file)),
         std::istreambuf_iterator<char>());
 
