@@ -118,61 +118,53 @@ Json::Value RefreshToken(const std::string& refresh_token, const std::string& cl
 
 int main(int argc, char* argv[])
 {
+
+	if (argc != 2 && argc != 1)
+		return 1;
+
+	std::string this_dir(argv[0]);
+	this_dir.erase(this_dir.rfind('\\') + 1, std::string::npos);
+
 	
-    if (argc != 2 && argc != 1 )
-        return 1;
+	Json::Reader reader;
 
-    std::string this_dir(argv[0]);
-    this_dir.erase(this_dir.rfind('\\') + 1, std::string::npos);
+	Json::Value client_secret_json;
+	reader.parse(std::ifstream("client_secret.json"), client_secret_json);
 
-    // Initialize Winsock
-    WSADATA wsa_data;
-    int result = WSAStartup(MAKEWORD(2, 2), &wsa_data);
-    if (result != 0) 
-    {
-        std::cout << "WSAStartup failed: " << result << std::endl;
-        return 1;
-    }
-
-    Json::Reader reader;
-
-    Json::Value client_secret_json;
-    reader.parse(std::ifstream( "client_secret.json"), client_secret_json);
-
-    std::string client_id = client_secret_json["installed"]["client_id"].asString();
-    std::string client_secret = client_secret_json["installed"]["client_secret"].asString();
-    std::string auth_url = client_secret_json["installed"]["auth_uri"].asString();
+	std::string client_id = client_secret_json["installed"]["client_id"].asString();
+	std::string client_secret = client_secret_json["installed"]["client_secret"].asString();
+	std::string auth_url = client_secret_json["installed"]["auth_uri"].asString();
 	std::cout << auth_url << std::endl;
-    // read our settings
-    Json::Value settings_json;
-    reader.parse(std::ifstream(this_dir + "settings.json"), settings_json);
-    
-    std::string access_token;
-    std::string token_type;
+	// read our settings
+	Json::Value settings_json;
+	reader.parse(std::ifstream(this_dir + "settings.json"), settings_json);
 
-    if (!settings_json["refresh_token"].isString())
-    {
-        // we do not have refresh token, do the handshake
-        std::string authorization_code = GetAuthorizationCode(auth_url, client_id);
+	std::string access_token;
+	std::string token_type;
 
-        Json::Value auth_reply = Authenticate(authorization_code, client_id, client_secret);
+	if (!settings_json["refresh_token"].isString())
+	{
+		// we do not have refresh token, do the handshake
+		std::string authorization_code = GetAuthorizationCode(auth_url, client_id);
 
-        Json::Value settings;
-        settings["refresh_token"] = auth_reply["refresh_token"].asString();
-        Json::StyledStreamWriter().write(std::ofstream(this_dir + "settings.json"), settings);
+		Json::Value auth_reply = Authenticate(authorization_code, client_id, client_secret);
 
-        access_token = auth_reply["access_token"].asString();
-        token_type = auth_reply["token_type"].asString();
-    }
-    else
-    {
-        // refresh access token
-        // https://developers.google.com/identity/protocols/OAuth2InstalledApp#refresh
-        Json::Value refresh_token_reply = RefreshToken(settings_json["refresh_token"].asString(), client_id, client_secret);
+		Json::Value settings;
+		settings["refresh_token"] = auth_reply["refresh_token"].asString();
+		Json::StyledStreamWriter().write(std::ofstream(this_dir + "settings.json"), settings);
 
-        access_token = refresh_token_reply["access_token"].asString();
-        token_type = refresh_token_reply["token_type"].asString();
-    }
+		access_token = auth_reply["access_token"].asString();
+		token_type = auth_reply["token_type"].asString();
+	}
+	else
+	{
+		// refresh access token
+		// https://developers.google.com/identity/protocols/OAuth2InstalledApp#refresh
+		Json::Value refresh_token_reply = RefreshToken(settings_json["refresh_token"].asString(), client_id, client_secret);
+
+		access_token = refresh_token_reply["access_token"].asString();
+		token_type = refresh_token_reply["token_type"].asString();
+	}
 
 	std::ifstream upload_file;
 	if (argc == 1) // Get name from input
@@ -191,17 +183,17 @@ int main(int argc, char* argv[])
 		std::abort();
 	}
 
-    std::string upload_file_content((std::istreambuf_iterator<char>(upload_file)),
-        std::istreambuf_iterator<char>());
+	std::string upload_file_content((std::istreambuf_iterator<char>(upload_file)),
+		std::istreambuf_iterator<char>());
 
-    std::vector<std::string> http_fields = 
-    {
-        "Authorization: " + token_type + " " + access_token, 
-        "Content-Type: text/plain",
-        "Content-Length: " + std::to_string(upload_file_content.size()),
-    };
+	std::vector<std::string> http_fields =
+	{
+		"Authorization: " + token_type + " " + access_token,
+		"Content-Type: text/plain",
+		"Content-Length: " + std::to_string(upload_file_content.size()),
+	};
 
-    std::string url = "https://www.googleapis.com/upload/drive/v3/files?uploadType=media";
+	std::string url = "https://www.googleapis.com/upload/drive/v3/files?uploadType=media";
 
 	Curl curl{};
 
@@ -209,11 +201,56 @@ int main(int argc, char* argv[])
 		curl.add_header(i);
 	curl.use_ssl(false).set_type(Curl::Request_type::post).set_url(url);
 
-    std::vector<char> response;
+	std::vector<char> response;
 
 	int http_code = curl.send(upload_file_content, response);
-	std::cout << http_code << std::endl;
-	
+	std::cout << "UPLOAD - " <<  http_code << std::endl;
+	std::string file_stats{ response.data() , response.size() };
+	//std::cout << file_stats << std::endl;
+
+// --------------------------------------------------------------
+
+	try // Rename file block
+	{
+		Json::Value file_id;
+		Json::Reader reader;
+		reader.parse(file_stats.c_str(), file_id);
+		if (file_id["id"].asString() == "")
+		{
+			std::cerr << "Something went wrong" << std::endl;
+			throw std::runtime_error{ "Unable to read file id" };
+		}
+
+		std::string up_url = "https://www.googleapis.com/drive/v2/files/";
+		up_url += file_id["id"].asString() + "?key=" + client_id;
+
+		Json::Value file_name;
+		std::string tmp_name;
+		std::cout << "Rename to: "; // Temporary solution
+		std::cin >> tmp_name;
+		file_name["title"] = tmp_name;
+		
+		{ 
+			Json::Value refresh_token_reply = RefreshToken(settings_json["refresh_token"].asString(), client_id, client_secret); // Here is little bug - first time settings_json is empty
+			access_token = refresh_token_reply["access_token"].asString();
+			if (access_token == "")
+				throw std::runtime_error{"Unable to get access_token"};
+		}
+
+		std::vector<char> res;
+		Curl curl2;
+		curl2.set_type(Curl::Request_type::put).use_ssl(true).set_url(up_url).\
+			add_header(std::string{ "Authorization: Bearer " } +access_token).add_header("Content-type: application/json");
+
+		std::cout << "Rename - " << curl2.send(file_name.toStyledString(), res) << std::endl;
+
+
+	}
+	catch (std::exception &e)
+	{
+		std::cerr << e.what() << std::endl;
+		return 11;
+	}
 	// Wait for input
 	char c;
 	std::cin >> c;
