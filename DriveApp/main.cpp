@@ -48,15 +48,11 @@ std::string GetAuthorizationCode(const std::string& auth_url, const std::string&
 	tcp.send_data("HTTP / 1.1 200 OK\r\nContent - Type: text / html\r\nContent - Length: 37\r\n\r\nThank you!You can close the browser.");
 	tcp.close_connection();
 
-	
+	std::smatch matches;
+	std::regex_search( request , matches, std::regex{ "code=\\S*" });
 
-    request.erase(request.find('\r'), std::string::npos);
-    
-    request.erase(0, 11);
-    request.erase(request.size() - 9, std::string::npos);
 
-	
-    return request;
+	return std::string{ matches[0] }.erase(0, 5);// erase 'code='
 }
 
 // fwrite signature
