@@ -7,6 +7,12 @@
     <Filter Include="curl">
       <UniqueIdentifier>{f8420b40-cc47-4fba-abba-a1795a2de0d0}</UniqueIdentifier>
     </Filter>
+    <Filter Include="curl_cpp">
+      <UniqueIdentifier>{fa77efd7-2d69-4e44-befb-f208377a2bb1}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="tcp_communicator">
+      <UniqueIdentifier>{020d1bc7-13b9-45e7-894c-918ea68f0acf}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="json\json.h">
@@ -42,11 +48,23 @@
     <ClInclude Include="libcurl-vc14-x86-release-static-ipv6-sspi-winssl\include\curl\typecheck-gcc.h">
       <Filter>curl</Filter>
     </ClInclude>
+    <ClInclude Include="curl_cpp\curl.h">
+      <Filter>curl_cpp</Filter>
+    </ClInclude>
+    <ClInclude Include="tcp_communicator\tcp_communicator.h">
+      <Filter>tcp_communicator</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="json\jsoncpp.cpp">
       <Filter>json</Filter>
     </ClCompile>
     <ClCompile Include="main.cpp" />
+    <ClCompile Include="curl_cpp\curl.cpp">
+      <Filter>curl_cpp</Filter>
+    </ClCompile>
+    <ClCompile Include="tcp_communicator\tcp_communicator.cpp">
+      <Filter>tcp_communicator</Filter>
+    </ClCompile>
   </ItemGroup>
 </Project>

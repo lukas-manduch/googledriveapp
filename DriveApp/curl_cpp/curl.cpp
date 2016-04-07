@@ -84,4 +84,6 @@ const std::string Curl::get_method(Request_type type)
 			return std::string { "GET" };
 			break;
 	}
+
+    throw std::runtime_error("Invalid request type.");
 }

@@ -11,6 +11,7 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="curl_cpp\curl.h" />
     <ClInclude Include="json\json-forwards.h" />
     <ClInclude Include="json\json.h" />
     <ClInclude Include="libcurl-vc14-x86-release-static-ipv6-sspi-winssl\include\curl\curl.h" />
@@ -22,10 +23,13 @@
     <ClInclude Include="libcurl-vc14-x86-release-static-ipv6-sspi-winssl\include\curl\multi.h" />
     <ClInclude Include="libcurl-vc14-x86-release-static-ipv6-sspi-winssl\include\curl\stdcheaders.h" />
     <ClInclude Include="libcurl-vc14-x86-release-static-ipv6-sspi-winssl\include\curl\typecheck-gcc.h" />
+    <ClInclude Include="tcp_communicator\tcp_communicator.h" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="curl_cpp\curl.cpp" />
     <ClCompile Include="json\jsoncpp.cpp" />
     <ClCompile Include="main.cpp" />
+    <ClCompile Include="tcp_communicator\tcp_communicator.cpp" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <ProjectGuid>{61396491-EE59-4721-BEC3-AE552F0591DC}</ProjectGuid>
