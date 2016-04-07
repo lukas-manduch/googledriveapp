@@ -16,7 +16,7 @@ Tcp_communicator::Tcp_communicator()
 	if (WSAStartup(MAKEWORD(2, 2), &wsaData) != 0)
 		throw std::exception("Error WSAStartup() failed\n");
 
-    ScopeGuard wsa_cleanup = MakeGuard(WSACleanup);
+    ScopeExit wsa_cleanup = MakeGuard(WSACleanup);
 
 	struct addrinfo hints;
 	ZeroMemory(&hints, sizeof(hints));
@@ -49,7 +49,7 @@ Tcp_communicator::Tcp_communicator()
 	}
 	freeaddrinfo(result);
 
-    wsa_cleanup.Dismiss();
+    //wsa_cleanup.Dismiss();
 }
 
 //	-------------------------------------------------------------------------------------------

@@ -1,7 +1,6 @@
 #pragma once
 
-
-class ScopeGuardImplBase
+class ScopeExitImplBase
 {
 public:
     void Dismiss() const 
@@ -9,21 +8,21 @@ public:
         m_dismissed = true;
     }
 
-    ScopeGuardImplBase() = default;
+    ScopeExitImplBase() = default;
 
-    ScopeGuardImplBase(const ScopeGuardImplBase&) = delete;
-    ScopeGuardImplBase& operator=(const ScopeGuardImplBase&) = delete;
+    ScopeExitImplBase(const ScopeExitImplBase&) = delete;
+    ScopeExitImplBase& operator=(const ScopeExitImplBase&) = delete;
 
-    ScopeGuardImplBase& operator=(ScopeGuardImplBase&& other)
+    ScopeExitImplBase& operator=(ScopeExitImplBase&& rhs)
     {
-        if (&other != this)
+        if (&rhs != this)
         {
-            m_dismissed = other.m_dismissed;
-            other.Dismiss();
+            m_dismissed = rhs.m_dismissed;
+            rhs.Dismiss();
         }
     }
 protected:
-    ~ScopeGuardImplBase() {}
+    ~ScopeExitImplBase() {}
 
     template <typename J>
     static void SafeExecute(J& j)
@@ -38,22 +37,27 @@ protected:
 };
 
 template <typename Lambda>
-class ScopeGuardImpl : public ScopeGuardImplBase
+class ScopeExitImpl : public ScopeExitImplBase
 {
     Lambda m_fun;
 public:
-    ScopeGuardImpl(Lambda fun) : m_fun(fun) {}
-    ~ScopeGuardImpl() { SafeExecute(*this); } 
+    ScopeExitImpl(Lambda fun) : m_fun(fun) {}
+    ~ScopeExitImpl() { SafeExecute(*this); } 
 
-    ScopeGuardImpl(const ScopeGuardImpl&) = delete;
-    ScopeGuardImpl& operator=(const ScopeGuardImpl&) = delete;
+    ScopeExitImpl(const ScopeExitImpl&) = delete;
+    ScopeExitImpl& operator=(const ScopeExitImpl&) = delete;
 
-    ScopeGuardImpl& operator=(ScopeGuardImpl&& other)
+    ScopeExitImpl(ScopeExitImpl&& other)
+    {
+        *this = std::move(other);
+    }
+
+    ScopeExitImpl& operator=(ScopeExitImpl&& other)
     {
         if (&other != this)
         {
             m_fun = std::move(other.m_fun);
-            (*static_cast<ScopeGuardImplBase*>(this)) = static_cast<ScopeGuardImplBase>(other);
+            (*static_cast<ScopeExitImplBase*>(this)) = std::move(static_cast<ScopeExitImplBase>(other));
         }
     }
 
@@ -61,12 +65,12 @@ public:
 };
 
 template <typename Fun>
-ScopeGuardImpl<Fun> MakeGuard(Fun fun)
+ScopeExitImpl<Fun> MakeGuard(Fun fun)
 {
-    return ScopeGuardImpl<Fun>(fun);
+    return ScopeExitImpl<Fun>(fun);
 }
 
-typedef const ScopeGuardImplBase& ScopeGuard;
+typedef const ScopeExitImplBase& ScopeExit;
 
 /*
 #define TOKEN_PASTEx(x, y) x ## y
