@@ -23,6 +23,7 @@
     <ClInclude Include="libcurl-vc14-x86-release-static-ipv6-sspi-winssl\include\curl\multi.h" />
     <ClInclude Include="libcurl-vc14-x86-release-static-ipv6-sspi-winssl\include\curl\stdcheaders.h" />
     <ClInclude Include="libcurl-vc14-x86-release-static-ipv6-sspi-winssl\include\curl\typecheck-gcc.h" />
+    <ClInclude Include="scope_exit.h" />
     <ClInclude Include="tcp_communicator\tcp_communicator.h" />
   </ItemGroup>
   <ItemGroup>

@@ -59,10 +59,9 @@ size_t Curl::WriteVectorCallback(void * ptr, size_t size, size_t count, std::vec
 {
 	try
 	{
-		mem->reserve(size*count);
 		mem->insert(mem->end(), static_cast<char*>(ptr), static_cast<char*>(ptr) + (size * count));
 	}
-	catch (...)
+	catch (const std::exception&)
 	{
 		return 0; // Generate error
 	}

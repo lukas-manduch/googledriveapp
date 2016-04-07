@@ -49,8 +49,7 @@ std::string GetAuthorizationCode(const std::string& auth_url, const std::string&
 	tcp.close_connection();
 
 	std::smatch matches;
-	std::regex_search( request , matches, std::regex{ "code=\\S*" });
-
+	std::regex_search( request , matches, std::regex{ R"(code=\S*)" });
 
 	return std::string{ matches[0] }.erase(0, 5);// erase 'code='
 }
@@ -118,6 +117,8 @@ Json::Value RefreshToken(const std::string& refresh_token, const std::string& cl
 
 int main(int argc, char* argv[])
 {
+    Tcp_communicator{};
+
 
 	if (argc != 2 && argc != 1)
 		return 1;

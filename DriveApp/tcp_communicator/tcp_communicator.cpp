@@ -5,6 +5,7 @@
 #include <ws2tcpip.h>
 #pragma comment(lib,"ws2_32.lib") 
 
+#include "scope_exit.h"
 #include "tcp_communicator.h"
 
 Tcp_communicator::Tcp_communicator()
@@ -14,6 +15,8 @@ Tcp_communicator::Tcp_communicator()
 	// Initialize Winsock
 	if (WSAStartup(MAKEWORD(2, 2), &wsaData) != 0)
 		throw std::exception("Error WSAStartup() failed\n");
+
+    ScopeGuard wsa_cleanup = MakeGuard(WSACleanup);
 
 	struct addrinfo hints;
 	ZeroMemory(&hints, sizeof(hints));
@@ -26,7 +29,6 @@ Tcp_communicator::Tcp_communicator()
 	struct addrinfo *result = NULL;
 	if (getaddrinfo(NULL, std::to_string(0).c_str(), &hints, &result) != 0) // 2nd parameter 0 = pick any number
 	{
-		WSACleanup();
 		throw std::exception("Error getaddrinfo failed\n");
 	}
 
@@ -35,7 +37,6 @@ Tcp_communicator::Tcp_communicator()
 	if (listen_socket == INVALID_SOCKET)
 	{
 		freeaddrinfo(result);
-		WSACleanup();
 		throw std::exception("Error creating socket failed\n");
 	}
 
@@ -44,10 +45,11 @@ Tcp_communicator::Tcp_communicator()
 	{
 		freeaddrinfo(result);
 		closesocket(listen_socket);
-		WSACleanup();
 		throw std::exception("Error binding socket failed\n");
 	}
 	freeaddrinfo(result);
+
+    wsa_cleanup.Dismiss();
 }
 
 //	-------------------------------------------------------------------------------------------

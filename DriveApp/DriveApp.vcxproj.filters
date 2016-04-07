@@ -54,6 +54,7 @@
     <ClInclude Include="tcp_communicator\tcp_communicator.h">
       <Filter>tcp_communicator</Filter>
     </ClInclude>
+    <ClInclude Include="scope_exit.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="json\jsoncpp.cpp">
