@@ -49,7 +49,7 @@ Tcp_communicator::Tcp_communicator()
 	}
 	freeaddrinfo(result);
 
-    //wsa_cleanup.Dismiss();
+    wsa_cleanup.Dismiss();
 }
 
 //	-------------------------------------------------------------------------------------------
