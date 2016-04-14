@@ -16,20 +16,20 @@
 int local_port_number;
 std::string GetAuthorizationCode(const std::string& auth_url, const std::string& client_id)
 {
-	
-    std::string url = auth_url;    
-    url += std::string("?scope=") + "https://www.googleapis.com/auth/drive"; // scope (our permissions)
-    url += "&response_type=code";
-    url += std::string("&client_id=") + client_id;
-    
+
+	std::string url = auth_url;
+	url += std::string("?scope=") + "https://www.googleapis.com/auth/drive"; // scope (our permissions)
+	url += "&response_type=code";
+	url += std::string("&client_id=") + client_id;
+
 	Tcp_communicator tcp{};
-	
+
 	url += "&redirect_uri=http://localhost:"; // prompt user to enter code
 	url += std::to_string(tcp.get_port_number());
 	local_port_number = tcp.get_port_number();
-    std::wstring wurl(url.begin(), url.end());
+	std::wstring wurl(url.begin(), url.end());
 
-    ShellExecute(NULL, L"open", wurl.c_str(), NULL, NULL, SW_SHOWNORMAL);
+	ShellExecute(NULL, L"open", wurl.c_str(), NULL, NULL, SW_SHOWNORMAL);
 
 	tcp.set_timeout(10);
 	if (!tcp.accept_connection())
@@ -46,7 +46,7 @@ std::string GetAuthorizationCode(const std::string& auth_url, const std::string&
 	tcp.close_connection();
 
 	std::smatch matches;
-	std::regex_search( request , matches, std::regex{ R"(code=\S*)" });
+	std::regex_search(request, matches, std::regex{ R"(code=\S*)" });
 
 	return std::string{ matches[0] }.erase(0, 5);// erase 'code='
 }
@@ -54,65 +54,65 @@ std::string GetAuthorizationCode(const std::string& auth_url, const std::string&
 // fwrite signature
 size_t WriteVectorCallback(void *ptr, size_t size, size_t count, std::vector<char> *mem)
 {
-    mem->insert(mem->end(), static_cast<char*>(ptr), static_cast<char*>(ptr) + (size * count));
-    return count;
+	mem->insert(mem->end(), static_cast<char*>(ptr), static_cast<char*>(ptr) + (size * count));
+	return count;
 }
 
 Json::Value Authenticate(const std::string& authorization_code, const std::string& client_id, const std::string& client_secret)
 {
-    std::stringstream post;
-    post << "code=" << authorization_code << "&"
-        << "client_id=" << client_id << "&"
-        << "client_secret=" << client_secret << "&"
-        << "redirect_uri=http://localhost:" << local_port_number << "&"
-        << "grant_type=authorization_code";
+	std::stringstream post;
+	post << "code=" << authorization_code << "&"
+		<< "client_id=" << client_id << "&"
+		<< "client_secret=" << client_secret << "&"
+		<< "redirect_uri=http://localhost:" << local_port_number << "&"
+		<< "grant_type=authorization_code";
 
-    std::string post_str = post.str();
-    std::string token_uri = "https://accounts.google.com/o/oauth2/token";
+	std::string post_str = post.str();
+	std::string token_uri = "https://accounts.google.com/o/oauth2/token";
 
-    
+
 	Curl curl{};
 	curl.use_ssl(false).set_url(token_uri).set_type(Curl::Request_type::post);
-    
-	std::vector<char> response;
-	
-    int http_code = curl.send(post.str(), response);;
-	std::cout << "Authenticate - " << http_code << std::endl;
-	
-    Json::Reader reader;
 
-    Json::Value ret_val;
-    reader.parse(&response[0], &response[0] + response.size(), ret_val);
-    return ret_val;
+	std::vector<char> response;
+
+	int http_code = curl.send(post.str(), response);;
+	std::cout << "Authenticate - " << http_code << std::endl;
+
+	Json::Reader reader;
+
+	Json::Value ret_val;
+	reader.parse(&response[0], &response[0] + response.size(), ret_val);
+	return ret_val;
 }
 
 Json::Value RefreshToken(const std::string& refresh_token, const std::string& client_id, const std::string& client_secret)
 {
-    std::stringstream post;
-    post << "client_id=" << client_id << "&"
-        << "client_secret=" << client_secret << "&"
-        << "refresh_token=" << refresh_token << "&"
-        << "grant_type=refresh_token";
+	std::stringstream post;
+	post << "client_id=" << client_id << "&"
+		<< "client_secret=" << client_secret << "&"
+		<< "refresh_token=" << refresh_token << "&"
+		<< "grant_type=refresh_token";
 
-    std::string post_str = post.str();
-    std::string token_uri = "https://www.googleapis.com/oauth2/v4/token";
+	std::string post_str = post.str();
+	std::string token_uri = "https://www.googleapis.com/oauth2/v4/token";
 
-  
+
 	Curl curl{};
 	curl.use_ssl(false).set_type(Curl::Request_type::post).set_url(token_uri);
-  
+
 	std::vector<char> response;
-    int http_code = curl.send(post.str() , response);
+	int http_code = curl.send(post.str(), response);
 	if (http_code < 200 || http_code > 299)
-		throw std::runtime_error{"Unable to authenticate"};
-  
+		throw std::runtime_error{ "Unable to authenticate" };
+
 	Json::Reader reader;
 
-    Json::Value ret_val;
-    reader.parse(&response[0], &response[0] + response.size(), ret_val);
-    return ret_val;
+	Json::Value ret_val;
+	reader.parse(&response[0], &response[0] + response.size(), ret_val);
+	return ret_val;
 }
-std::string get_access_token(const std::string refresh_token , const std::string client_id, const std::string client_secret )
+std::string get_access_token(const std::string refresh_token, const std::string client_id, const std::string client_secret)
 {
 	Json::Value refresh_token_reply = RefreshToken(refresh_token, client_id, client_secret);
 	std::string access_token = refresh_token_reply["access_token"].asString();
@@ -120,7 +120,7 @@ std::string get_access_token(const std::string refresh_token , const std::string
 		throw std::runtime_error{ "Unable to get access_token" };
 	return access_token;
 }
-std::string get_refresh_token(const std::string& file_name , const std::string& auth_url, const std::string& client_id, const std::string& client_secret )
+std::string get_refresh_token(const std::string& file_name, const std::string& auth_url, const std::string& client_id, const std::string& client_secret)
 {
 	Json::Reader reader;
 	Json::Value settings_json;
@@ -133,7 +133,7 @@ std::string get_refresh_token(const std::string& file_name , const std::string& 
 			std::string access_token = get_access_token(refresh_token, client_id, client_secret);
 			return refresh_token;
 		}
-		throw std::runtime_error{""}; // Go to catch
+		throw std::runtime_error{ "" }; // Go to catch
 	}
 	catch (const  std::exception &e)
 	{
@@ -144,19 +144,19 @@ std::string get_refresh_token(const std::string& file_name , const std::string& 
 		Json::StyledStreamWriter().write(std::ofstream(file_name), settings);
 		return settings["refresh_token"].asString();
 	}
-	
-	
+
+
 }
 int main(int argc, char* argv[])
-try 
+try
 {
- 	if (argc != 2 && argc != 1)
+	if (argc != 2 && argc != 1)
 		return 1;
 
 	std::string this_dir(argv[0]);
 	this_dir.erase(this_dir.rfind('\\') + 1, std::string::npos);
 
-	
+
 	Json::Reader reader;
 	Json::Value client_secret_json;
 
@@ -166,7 +166,7 @@ try
 	std::string client_id = client_secret_json["installed"]["client_id"].asString();
 	std::string client_secret = client_secret_json["installed"]["client_secret"].asString();
 	std::string auth_url = client_secret_json["installed"]["auth_uri"].asString();
-	
+
 	// read our settings
 	Json::Value settings_json;
 	reader.parse(std::ifstream(this_dir + "settings.json"), settings_json);
@@ -174,10 +174,10 @@ try
 	std::string access_token;
 	std::string token_type;
 
-	std::string refresh_token = get_refresh_token(this_dir + "settings.json" , auth_url , client_id , client_secret);
+	std::string refresh_token = get_refresh_token(this_dir + "settings.json", auth_url, client_id, client_secret);
 	access_token = get_access_token(refresh_token, client_id, client_secret);
 
-	
+
 
 	std::ifstream upload_file;
 	if (argc == 1) // Get name from input
@@ -217,13 +217,13 @@ try
 	std::vector<char> response;
 
 	int http_code = curl.send(upload_file_content, response);
-	std::cout << "UPLOAD - " <<  http_code << std::endl;
+	std::cout << "UPLOAD - " << http_code << std::endl;
 	std::string file_stats{ response.data() , response.size() };
 	//std::cout << file_stats << std::endl;
 
 // --------------------------------------------------------------
 
-	try // Rename file block
+	 // Rename file block
 	{
 		Json::Value file_id;
 		Json::Reader reader;
@@ -242,7 +242,7 @@ try
 		std::cout << "Rename to: "; // Temporary solution
 		std::cin >> tmp_name;
 		file_name["title"] = tmp_name;
-		
+
 		access_token = get_access_token(refresh_token, client_id, client_secret);
 
 		std::vector<char> res;
@@ -252,18 +252,13 @@ try
 
 		std::cout << "Rename - " << curl2.send(file_name.toStyledString(), res) << std::endl;
 
+	}
 
-	}
-	catch (std::exception &e)
-	{
-		std::cerr << e.what() << std::endl;
-		return 11;
-	}
 	// Wait for input
 	char c;
 	std::cin >> c;
-    
-    return 0;
+
+	return 0;
 }
 catch (const std::exception &e)
 {
