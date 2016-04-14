@@ -135,7 +135,7 @@ std::string get_refresh_token(const std::string& file_name, const std::string& a
 		}
 		throw std::runtime_error{ "" }; // Go to catch
 	}
-	catch (const  std::exception &e)
+	catch (const std::exception&)
 	{
 		std::string authorization_code = GetAuthorizationCode(auth_url, client_id);
 		Json::Value auth_reply = Authenticate(authorization_code, client_id, client_secret);

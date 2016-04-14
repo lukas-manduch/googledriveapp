@@ -72,17 +72,16 @@ ScopeExitImpl<Fun> MakeGuard(Fun fun)
 
 typedef const ScopeExitImplBase& ScopeExit;
 
-/*
-#define TOKEN_PASTEx(x, y) x ## y
-#define TOKEN_PASTE(x, y) TOKEN_PASTEx(x, y)
 
-#define Auto_INTERNAL1(lname, aname, ...) \
+#define TOKEN_PASTE2(x, y) x ## y
+#define TOKEN_PASTE(x, y) TOKEN_PASTE2(x, y)
+
+#define ON_SCOPE_EXIT_INTERNAL1(lname, aname, ...) \
     auto lname = [&]() { __VA_ARGS__; }; \
-    AtScopeExit<decltype(lname)> aname(lname);
+    ScopeExit aname = MakeGuard(lname);
 
-#define Auto_INTERNAL2(ctr, ...) \
-    Auto_INTERNAL1(TOKEN_PASTE(Auto_func_, ctr), \
+#define ON_SCOPE_EXIT_INTERNAL2(ctr, ...) \
+    ON_SCOPE_EXIT_INTERNAL1(TOKEN_PASTE(Auto_func_, ctr), \
                    TOKEN_PASTE(Auto_instance_, ctr), __VA_ARGS__)
 
-#define Auto(...) Auto_INTERNAL2(__LINE__, __VA_ARGS__)
-*/
+#define ON_SCOPE_EXIT(...) ON_SCOPE_EXIT_INTERNAL2(__LINE__, __VA_ARGS__)
