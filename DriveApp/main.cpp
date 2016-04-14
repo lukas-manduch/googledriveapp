@@ -24,16 +24,12 @@ std::string GetAuthorizationCode(const std::string& auth_url, const std::string&
     
 	Tcp_communicator tcp{};
 	
-	//url += "&redirect_uri=http://localhost:3537"; // prompt user to enter code
 	url += "&redirect_uri=http://localhost:"; // prompt user to enter code
 	url += std::to_string(tcp.get_port_number());
 	local_port_number = tcp.get_port_number();
     std::wstring wurl(url.begin(), url.end());
 
-	
-
     ShellExecute(NULL, L"open", wurl.c_str(), NULL, NULL, SW_SHOWNORMAL);
-
 
 	tcp.set_timeout(10);
 	if (!tcp.accept_connection())
@@ -44,6 +40,7 @@ std::string GetAuthorizationCode(const std::string& auth_url, const std::string&
 	std::vector<byte> raw_data = tcp.get_data();
 
 	static_assert(sizeof(byte) == sizeof(char), "Size of char != size of byte");
+
 	std::string request(reinterpret_cast<char*>(raw_data.data()), raw_data.size());
 	tcp.send_data("HTTP / 1.1 200 OK\r\nContent - Type: text / html\r\nContent - Length: 37\r\n\r\nThank you!You can close the browser.");
 	tcp.close_connection();
@@ -106,7 +103,8 @@ Json::Value RefreshToken(const std::string& refresh_token, const std::string& cl
   
 	std::vector<char> response;
     int http_code = curl.send(post.str() , response);
-	std::cout << "Refresh token - " << http_code << std::endl;
+	if (http_code < 200 || http_code > 299)
+		throw std::runtime_error{"Unable to authenticate"};
   
 	Json::Reader reader;
 
@@ -114,13 +112,45 @@ Json::Value RefreshToken(const std::string& refresh_token, const std::string& cl
     reader.parse(&response[0], &response[0] + response.size(), ret_val);
     return ret_val;
 }
-
-int main(int argc, char* argv[])
+std::string get_access_token(const std::string refresh_token , const std::string client_id, const std::string client_secret )
 {
-    Tcp_communicator{};
-
-
-	if (argc != 2 && argc != 1)
+	Json::Value refresh_token_reply = RefreshToken(refresh_token, client_id, client_secret);
+	std::string access_token = refresh_token_reply["access_token"].asString();
+	if (access_token == "")
+		throw std::runtime_error{ "Unable to get access_token" };
+	return access_token;
+}
+std::string get_refresh_token(const std::string& file_name , const std::string& auth_url, const std::string& client_id, const std::string& client_secret )
+{
+	Json::Reader reader;
+	Json::Value settings_json;
+	try
+	{
+		reader.parse(std::ifstream(file_name), settings_json);
+		if (settings_json["refresh_token"].isString())
+		{
+			std::string  refresh_token = settings_json["refresh_token"].asString();
+			std::string access_token = get_access_token(refresh_token, client_id, client_secret);
+			return refresh_token;
+		}
+		throw std::runtime_error{""}; // Go to catch
+	}
+	catch (const  std::exception &e)
+	{
+		std::string authorization_code = GetAuthorizationCode(auth_url, client_id);
+		Json::Value auth_reply = Authenticate(authorization_code, client_id, client_secret);
+		Json::Value settings;
+		settings["refresh_token"] = auth_reply["refresh_token"].asString();
+		Json::StyledStreamWriter().write(std::ofstream(file_name), settings);
+		return settings["refresh_token"].asString();
+	}
+	
+	
+}
+int main(int argc, char* argv[])
+try 
+{
+ 	if (argc != 2 && argc != 1)
 		return 1;
 
 	std::string this_dir(argv[0]);
@@ -128,14 +158,15 @@ int main(int argc, char* argv[])
 
 	
 	Json::Reader reader;
-
 	Json::Value client_secret_json;
-	reader.parse(std::ifstream("client_secret.json"), client_secret_json);
+
+	if (!reader.parse(std::ifstream("client_secret.json"), client_secret_json))
+		throw std::runtime_error{ "invalid client_secret.json" };
 
 	std::string client_id = client_secret_json["installed"]["client_id"].asString();
 	std::string client_secret = client_secret_json["installed"]["client_secret"].asString();
 	std::string auth_url = client_secret_json["installed"]["auth_uri"].asString();
-	std::cout << auth_url << std::endl;
+	
 	// read our settings
 	Json::Value settings_json;
 	reader.parse(std::ifstream(this_dir + "settings.json"), settings_json);
@@ -143,29 +174,10 @@ int main(int argc, char* argv[])
 	std::string access_token;
 	std::string token_type;
 
-	if (!settings_json["refresh_token"].isString())
-	{
-		// we do not have refresh token, do the handshake
-		std::string authorization_code = GetAuthorizationCode(auth_url, client_id);
+	std::string refresh_token = get_refresh_token(this_dir + "settings.json" , auth_url , client_id , client_secret);
+	access_token = get_access_token(refresh_token, client_id, client_secret);
 
-		Json::Value auth_reply = Authenticate(authorization_code, client_id, client_secret);
-
-		Json::Value settings;
-		settings["refresh_token"] = auth_reply["refresh_token"].asString();
-		Json::StyledStreamWriter().write(std::ofstream(this_dir + "settings.json"), settings);
-
-		access_token = auth_reply["access_token"].asString();
-		token_type = auth_reply["token_type"].asString();
-	}
-	else
-	{
-		// refresh access token
-		// https://developers.google.com/identity/protocols/OAuth2InstalledApp#refresh
-		Json::Value refresh_token_reply = RefreshToken(settings_json["refresh_token"].asString(), client_id, client_secret);
-
-		access_token = refresh_token_reply["access_token"].asString();
-		token_type = refresh_token_reply["token_type"].asString();
-	}
+	
 
 	std::ifstream upload_file;
 	if (argc == 1) // Get name from input
@@ -189,7 +201,7 @@ int main(int argc, char* argv[])
 
 	std::vector<std::string> http_fields =
 	{
-		"Authorization: " + token_type + " " + access_token,
+		"Authorization: Bearer " + access_token,
 		"Content-Type: text/plain",
 		"Content-Length: " + std::to_string(upload_file_content.size()),
 	};
@@ -231,12 +243,7 @@ int main(int argc, char* argv[])
 		std::cin >> tmp_name;
 		file_name["title"] = tmp_name;
 		
-		{ 
-			Json::Value refresh_token_reply = RefreshToken(settings_json["refresh_token"].asString(), client_id, client_secret); // Here is little bug - first time settings_json is empty
-			access_token = refresh_token_reply["access_token"].asString();
-			if (access_token == "")
-				throw std::runtime_error{"Unable to get access_token"};
-		}
+		access_token = get_access_token(refresh_token, client_id, client_secret);
 
 		std::vector<char> res;
 		Curl curl2;
@@ -257,4 +264,12 @@ int main(int argc, char* argv[])
 	std::cin >> c;
     
     return 0;
+}
+catch (const std::exception &e)
+{
+	std::cerr << e.what() << std::endl;
+	std::cin.clear();
+	char c;
+	std::cin >> c;
+	return 1;
 }
