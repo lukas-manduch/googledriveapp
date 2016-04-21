@@ -190,8 +190,8 @@ bool upload_file(_In_ const std::string& file_name, _In_ const std::string& refr
 		std::string up_url = "https://www.googleapis.com/drive/v2/files/";
 		up_url += file_id + "?key=" + client_id;
 
-		Json::Value file_name;
-		file_name["title"] = file_name;
+		Json::Value file_name_json;
+		file_name_json["title"] = file_name;
 
 		std::string access_token = get_access_token(refresh_token, client_id, client_secret);
 
@@ -200,9 +200,10 @@ bool upload_file(_In_ const std::string& file_name, _In_ const std::string& refr
 		curl2.set_type(Curl::Request_type::put).use_ssl(true).set_url(up_url).\
 			add_header(std::string{ "Authorization: Bearer " } +access_token).add_header("Content-type: application/json");
 
-		int http = curl2.send(file_name.toStyledString(), res);
+		int http = curl2.send(file_name_json.toStyledString(), res);
 		if (http < 200 || http > 299)
 			throw std::runtime_error{ "Rename unsuccessful" };
+
 		return true;
 
 	}
