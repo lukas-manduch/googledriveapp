@@ -8,26 +8,42 @@
 #include "scope_exit.h"
 #include "tcp_communicator.h"
 
+_Check_return_ std::system_error GetWSASystemError(_In_ int error_code, _In_z_ char* file, _In_ size_t line)
+{
+    char buffer[512];
+    if (sprintf_s(buffer, "In file %s on line %u.", file, line) < 0)
+    {
+        buffer[0] = 0;
+    }
+
+    return std::system_error(error_code, std::system_category(), buffer);
+}
+
+#define THROW_LAST_WSA_SYSTEM_ERROR() throw GetWSASystemError((int)WSAGetLastError(), __FILE__, __LINE__)
+
+#define THROW_WSA_SYSTEM_ERROR(wsa_error_code) throw GetWSASystemError(wsa_error_code, __FILE__, __LINE__)
+
 Tcp_communicator::Tcp_communicator()
 {
-	// Initialize Winsock
-	if (WSAStartup(MAKEWORD(2, 2), &wsaData) != 0)
-		throw std::exception("Error WSAStartup() failed\n");
+    // Initialize Winsock
+    if (WSAStartup(MAKEWORD(2, 2), &wsaData) != 0)
+        THROW_LAST_WSA_SYSTEM_ERROR();
 
     ScopeExit wsa_cleanup = MakeGuard(WSACleanup);
 
-	struct addrinfo hints;
-	ZeroMemory(&hints, sizeof(hints));
-	hints.ai_family = AF_INET;
-	hints.ai_socktype = SOCK_STREAM;
-	hints.ai_protocol = IPPROTO_TCP;
-	hints.ai_flags = AI_PASSIVE;
+    struct addrinfo hints {};
+
+    hints.ai_family = AF_INET;
+    hints.ai_socktype = SOCK_STREAM;
+    hints.ai_protocol = IPPROTO_TCP;
+    hints.ai_flags = AI_PASSIVE;
 
 	// Resolve the server address and port
 	struct addrinfo *result = NULL;
-	if (getaddrinfo(NULL, "0", &hints, &result) != 0) // 2nd parameter 0 = pick any number
+    int error_code = getaddrinfo(NULL, "0", &hints, &result); // 2nd parameter 0 = pick any number
+    if (error_code != 0)
 	{
-		throw std::exception("Error getaddrinfo failed\n");
+        THROW_WSA_SYSTEM_ERROR(error_code);
 	}
 
 	// Create a SOCKET for connecting to server
@@ -36,14 +52,14 @@ Tcp_communicator::Tcp_communicator()
     ScopeExit addr_info_cleanup = MakeGuard([&result] () { freeaddrinfo(result); });
 	if (listen_socket == INVALID_SOCKET)
 	{
-		throw std::exception("Error creating socket failed\n");
+        THROW_LAST_WSA_SYSTEM_ERROR();
 	}
 
 	// Setup the TCP listening socket
 	if (bind(listen_socket, result->ai_addr, (int)result->ai_addrlen) == SOCKET_ERROR)
 	{
 		closesocket(listen_socket);
-		throw std::exception("Error binding socket failed\n");
+        THROW_LAST_WSA_SYSTEM_ERROR();
 	}
 
     wsa_cleanup.Dismiss();

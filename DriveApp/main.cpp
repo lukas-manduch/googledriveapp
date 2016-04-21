@@ -230,6 +230,8 @@ upload_file(
 int main(int argc, char* argv[])
 try
 {
+    Tcp_communicator();
+
 	if (argc != 2 && argc != 1)
 		return 1;
 
