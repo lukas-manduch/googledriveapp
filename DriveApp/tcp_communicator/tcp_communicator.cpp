@@ -10,8 +10,6 @@
 
 Tcp_communicator::Tcp_communicator()
 {
-	SOCKET ClientSocket = INVALID_SOCKET;
-
 	// Initialize Winsock
 	if (WSAStartup(MAKEWORD(2, 2), &wsaData) != 0)
 		throw std::exception("Error WSAStartup() failed\n");
@@ -27,7 +25,7 @@ Tcp_communicator::Tcp_communicator()
 
 	// Resolve the server address and port
 	struct addrinfo *result = NULL;
-	if (getaddrinfo(NULL, std::to_string(0).c_str(), &hints, &result) != 0) // 2nd parameter 0 = pick any number
+	if (getaddrinfo(NULL, "0", &hints, &result) != 0) // 2nd parameter 0 = pick any number
 	{
 		throw std::exception("Error getaddrinfo failed\n");
 	}
@@ -35,7 +33,7 @@ Tcp_communicator::Tcp_communicator()
 	// Create a SOCKET for connecting to server
 	listen_socket = socket(result->ai_family, result->ai_socktype, result->ai_protocol);
 	
-	ScopeExit addr_info_cleanup = MakeGuard(freeaddrinfo , result);
+    ScopeExit addr_info_cleanup = MakeGuard([&result] () { freeaddrinfo(result); });
 	if (listen_socket == INVALID_SOCKET)
 	{
 		throw std::exception("Error creating socket failed\n");
