@@ -51,13 +51,6 @@ std::string GetAuthorizationCode( _In_ const std::string& auth_url, _In_ const s
 	return std::string{ matches[0] }.erase(0, 5);// erase 'code='
 }
 
-// fwrite signature
-size_t WriteVectorCallback(void *ptr, size_t size, size_t count, std::vector<char> *mem)
-{
-	mem->insert(mem->end(), static_cast<char*>(ptr), static_cast<char*>(ptr) + (size * count));
-	return count;
-}
-
 Json::Value Authenticate(_In_ const std::string& authorization_code, _In_ const std::string& client_id, _In_ const std::string& client_secret)
 {
 	std::stringstream post;
