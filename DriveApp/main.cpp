@@ -148,7 +148,14 @@ std::string get_refresh_token(_In_ const std::string& file_name, _In_ const std:
 	}
 }
 //	---------------------------------------------------------------------------------------------
-void rename_file(_In_ const std::string& file_name, _In_ const std::string& file_id , _In_ const std::string& refresh_token, _In_ const std::string& client_id, _In_ const std::string& client_secret)
+void 
+rename_file(
+	_In_ const std::string& file_name, 
+	_In_ const std::string& file_id , 
+	_In_ const std::string& refresh_token, 
+	_In_ const std::string& client_id, 
+	_In_ const std::string& client_secret
+)
 // Rename file identified by file_id to file_name
 {
 	std::string up_url = "https://www.googleapis.com/drive/v2/files/";
@@ -170,7 +177,13 @@ void rename_file(_In_ const std::string& file_name, _In_ const std::string& file
 
 }
 //	---------------------------------------------------------------------------------------------
-std::string upload_file(_In_ const std::string& file_name, _In_ const std::string& refresh_token, _In_ const std::string& client_id, _In_ const std::string& client_secret)
+std::string 
+upload_file(
+	_In_ const std::string& file_name,
+	_In_ const std::string& refresh_token, 
+	_In_ const std::string& client_id, 
+	_In_ const std::string& client_secret
+)
 // Uploads file to drive and returns file id
 {
 	std::ifstream upload_file{ file_name };
