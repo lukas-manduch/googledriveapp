@@ -40,6 +40,10 @@ Curl & Curl::add_header( _In_ const std::string & header)
 
 unsigned int Curl::send(_In_ const std::string& message, _Out_ std::vector<char>& response)
 {
+	if (m_used)
+		throw std::runtime_error{"Curl cannot be reused"};
+	m_used = true;
+
 	if (list != nullptr)
 		curl_easy_setopt(curl, CURLOPT_HTTPHEADER, list);
 	

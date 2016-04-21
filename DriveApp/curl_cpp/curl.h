@@ -38,4 +38,5 @@ private:
 	const std::string get_method(Request_type);
 	CURL* curl;
 	struct curl_slist *list{ nullptr };
+	bool m_used{ false };
 };
