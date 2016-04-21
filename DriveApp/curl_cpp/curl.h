@@ -27,14 +27,14 @@ public:
 	// -------------------------------
 
 	Curl& set_type (Curl::Request_type);
-	Curl& set_url (const std::string& );
-	Curl& use_ssl (bool);
-	Curl& add_header(const std::string&);
+	Curl& set_url ( _In_ const std::string& );
+	Curl& use_ssl ( _In_ bool);
+	Curl& add_header( _In_ const std::string&);
 
-	unsigned int send(const std::vector<char>& message, std::vector<char>& response );
-	unsigned int send(const std::string& message, std::vector<char>& response);
+	//unsigned int send(const std::vector<char>& message, std::vector<char>& response );
+	unsigned int send( _In_ const std::string& message, _Out_ std::vector<char>& response);
 private:
-	static size_t WriteVectorCallback(void *ptr, size_t size, size_t count, std::vector<char> *mem);
+	static size_t WriteVectorCallback( _In_ void *ptr, _In_  size_t size,_In_ size_t count,_Inout_ std::vector<char> *mem);
 	const std::string get_method(Request_type);
 	CURL* curl;
 	struct curl_slist *list{ nullptr };

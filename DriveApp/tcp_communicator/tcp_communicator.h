@@ -19,12 +19,12 @@ public:
 	
 	// Functions
 	unsigned int get_port_number() const;
-	void set_timeout( int seconds );
+	void set_timeout( _In_ int seconds );
 	void unset_timeout();
 	bool accept_connection();
 	std::vector<byte> get_data();
 	
-	void send_data(const std::string& data);
+	void send_data( _In_ const std::string& data);
 	bool close_connection();
 
 	//std::vector<byte> get_data_and_respond(unsigned int max_bytes);

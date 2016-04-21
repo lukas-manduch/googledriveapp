@@ -20,25 +20,25 @@ Curl & Curl::set_type(Curl::Request_type type)
 	return *this;
 }
 
-Curl & Curl::set_url(const std::string & url)
+Curl & Curl::set_url( _In_ const std::string & url)
 {
 	curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
 	return *this;
 }
 
-Curl & Curl::use_ssl(bool ssl)
+Curl & Curl::use_ssl( _In_ bool ssl)
 {
 	curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, ssl);
 	return *this;
 }
 
-Curl & Curl::add_header(const std::string & header)
+Curl & Curl::add_header( _In_ const std::string & header)
 {
 	list = curl_slist_append(list, header.c_str());
 	return *this;
 }
 
-unsigned int Curl::send(const std::string& message, std::vector<char>& response)
+unsigned int Curl::send(_In_ const std::string& message, _Out_ std::vector<char>& response)
 {
 	if (list != nullptr)
 		curl_easy_setopt(curl, CURLOPT_HTTPHEADER, list);
@@ -55,7 +55,7 @@ unsigned int Curl::send(const std::string& message, std::vector<char>& response)
 	return http_code;
 }
 
-size_t Curl::WriteVectorCallback(void * ptr, size_t size, size_t count, std::vector<char>* mem)
+size_t Curl::WriteVectorCallback(_In_ void * ptr, _In_ size_t size, _In_ size_t count, _Inout_ std::vector<char>* mem)
 {
 	try
 	{

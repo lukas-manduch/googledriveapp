@@ -14,7 +14,7 @@
 
 
 int local_port_number;
-std::string GetAuthorizationCode(const std::string& auth_url, const std::string& client_id)
+std::string GetAuthorizationCode( _In_ const std::string& auth_url, _In_ const std::string& client_id)
 {
 
 	std::string url = auth_url;
@@ -58,7 +58,7 @@ size_t WriteVectorCallback(void *ptr, size_t size, size_t count, std::vector<cha
 	return count;
 }
 
-Json::Value Authenticate(const std::string& authorization_code, const std::string& client_id, const std::string& client_secret)
+Json::Value Authenticate(_In_ const std::string& authorization_code, _In_ const std::string& client_id, _In_ const std::string& client_secret)
 {
 	std::stringstream post;
 	post << "code=" << authorization_code << "&"
@@ -86,7 +86,7 @@ Json::Value Authenticate(const std::string& authorization_code, const std::strin
 	return ret_val;
 }
 
-Json::Value RefreshToken(const std::string& refresh_token, const std::string& client_id, const std::string& client_secret)
+Json::Value RefreshToken(_In_ const std::string& refresh_token, _In_ const std::string& client_id, _In_ const std::string& client_secret)
 {
 	std::stringstream post;
 	post << "client_id=" << client_id << "&"
@@ -112,7 +112,7 @@ Json::Value RefreshToken(const std::string& refresh_token, const std::string& cl
 	reader.parse(&response[0], &response[0] + response.size(), ret_val);
 	return ret_val;
 }
-std::string get_access_token(const std::string refresh_token, const std::string client_id, const std::string client_secret)
+std::string get_access_token(_In_ const std::string refresh_token, _In_ const std::string client_id, _In_ const std::string client_secret)
 {
 	Json::Value refresh_token_reply = RefreshToken(refresh_token, client_id, client_secret);
 	std::string access_token = refresh_token_reply["access_token"].asString();
@@ -120,7 +120,7 @@ std::string get_access_token(const std::string refresh_token, const std::string 
 		throw std::runtime_error{ "Unable to get access_token" };
 	return access_token;
 }
-std::string get_refresh_token(const std::string& file_name, const std::string& auth_url, const std::string& client_id, const std::string& client_secret)
+std::string get_refresh_token(_In_ const std::string& file_name, _In_ const std::string& auth_url, _In_ const std::string& client_id, _In_ const std::string& client_secret)
 {
 	Json::Reader reader;
 	Json::Value settings_json;
@@ -147,7 +147,7 @@ std::string get_refresh_token(const std::string& file_name, const std::string& a
 
 
 }
-bool upload_file(const std::string& file_name, const std::string& refresh_token, const std::string& client_id, const std::string& client_secret)
+bool upload_file(_In_ const std::string& file_name, _In_ const std::string& refresh_token, _In_ const std::string& client_id, _In_ const std::string& client_secret)
 {
 	std::string file_id;
 	{

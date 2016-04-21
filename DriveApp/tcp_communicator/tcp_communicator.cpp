@@ -55,7 +55,7 @@ Tcp_communicator::Tcp_communicator()
 //	-------------------------------------------------------------------------------------------
 
 
-void Tcp_communicator::set_timeout(int seconds)
+void Tcp_communicator::set_timeout(_In_ int seconds)
 {
 	is_nonblocking = true;
 	timeout.tv_sec = seconds;
@@ -173,7 +173,7 @@ std::vector<byte> Tcp_communicator::get_data()
 
 //	-------------------------------------------------------------------------------------------
 
-void Tcp_communicator::send_data(const std::string & data)
+void Tcp_communicator::send_data(_In_ const std::string & data)
 {
 	if (!is_connected())
 		throw std::exception{ "Trying to send_data via not connected socket" };
