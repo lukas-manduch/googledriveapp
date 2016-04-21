@@ -12,8 +12,12 @@
 // https://developers.google.com/identity/protocols/OAuth2InstalledApp
 // https://developers.google.com/drive/v3/web/about-auth
 
-
-int local_port_number;
+//	---------------------------------------------------------------------------------------------
+namespace
+{
+	int local_port_number;
+}
+//	---------------------------------------------------------------------------------------------
 std::string GetAuthorizationCode( _In_ const std::string& auth_url, _In_ const std::string& client_id)
 {
 
@@ -50,8 +54,9 @@ std::string GetAuthorizationCode( _In_ const std::string& auth_url, _In_ const s
 
 	return std::string{ matches[0] }.erase(0, 5);// erase 'code='
 }
-
+//	---------------------------------------------------------------------------------------------
 Json::Value Authenticate(_In_ const std::string& authorization_code, _In_ const std::string& client_id, _In_ const std::string& client_secret)
+// Use authorization code to get refresh token
 {
 	std::stringstream post;
 	post << "code=" << authorization_code << "&"
@@ -78,8 +83,9 @@ Json::Value Authenticate(_In_ const std::string& authorization_code, _In_ const 
 	reader.parse(&response[0], &response[0] + response.size(), ret_val);
 	return ret_val;
 }
-
+//	---------------------------------------------------------------------------------------------
 Json::Value RefreshToken(_In_ const std::string& refresh_token, _In_ const std::string& client_id, _In_ const std::string& client_secret)
+// Use refresh token to get access token
 {
 	std::stringstream post;
 	post << "client_id=" << client_id << "&"
@@ -105,6 +111,7 @@ Json::Value RefreshToken(_In_ const std::string& refresh_token, _In_ const std::
 	reader.parse(&response[0], &response[0] + response.size(), ret_val);
 	return ret_val;
 }
+//	---------------------------------------------------------------------------------------------
 std::string get_access_token(_In_ const std::string refresh_token, _In_ const std::string client_id, _In_ const std::string client_secret)
 {
 	Json::Value refresh_token_reply = RefreshToken(refresh_token, client_id, client_secret);
@@ -113,12 +120,14 @@ std::string get_access_token(_In_ const std::string refresh_token, _In_ const st
 		throw std::runtime_error{ "Unable to get access_token" };
 	return access_token;
 }
+//	---------------------------------------------------------------------------------------------
 std::string get_refresh_token(_In_ const std::string& file_name, _In_ const std::string& auth_url, _In_ const std::string& client_id, _In_ const std::string& client_secret)
 {
-	Json::Reader reader;
-	Json::Value settings_json;
-	try
+	
+	try // Try to use refresh token from file_name
 	{
+		Json::Reader reader;
+		Json::Value settings_json;
 		reader.parse(std::ifstream(file_name), settings_json);
 		if (settings_json["refresh_token"].isString())
 		{
@@ -128,7 +137,7 @@ std::string get_refresh_token(_In_ const std::string& file_name, _In_ const std:
 		}
 		throw std::runtime_error{ "" }; // Go to catch
 	}
-	catch (const std::exception&)
+	catch (const std::exception&) // Get new refresh token
 	{
 		std::string authorization_code = GetAuthorizationCode(auth_url, client_id);
 		Json::Value auth_reply = Authenticate(authorization_code, client_id, client_secret);
@@ -137,78 +146,74 @@ std::string get_refresh_token(_In_ const std::string& file_name, _In_ const std:
 		Json::StyledStreamWriter().write(std::ofstream(file_name), settings);
 		return settings["refresh_token"].asString();
 	}
-
-
 }
-bool upload_file(_In_ const std::string& file_name, _In_ const std::string& refresh_token, _In_ const std::string& client_id, _In_ const std::string& client_secret)
+//	---------------------------------------------------------------------------------------------
+void rename_file(_In_ const std::string& file_name, _In_ const std::string& file_id , _In_ const std::string& refresh_token, _In_ const std::string& client_id, _In_ const std::string& client_secret)
+// Rename file identified by file_id to file_name
 {
-	std::string file_id;
-	{
-		std::ifstream upload_file{ file_name };
-		if (!upload_file.is_open())
-			throw std::runtime_error{ "Bad file name" };
-		std::string upload_file_content((std::istreambuf_iterator<char>(upload_file)),
-			std::istreambuf_iterator<char>());
+	std::string up_url = "https://www.googleapis.com/drive/v2/files/";
+	up_url += file_id + "?key=" + client_id;
 
-		std::string access_token = get_access_token(refresh_token, client_id, client_secret);
+	Json::Value file_name_json;
+	file_name_json["title"] = file_name;
 
-		std::vector<std::string> http_fields =
-		{
-			"Authorization: Bearer " + access_token,
-			"Content-Type: text/plain",
-			"Content-Length: " + std::to_string(upload_file_content.size()),
-		};
+	std::string access_token = get_access_token(refresh_token, client_id, client_secret);
 
-		std::string url = "https://www.googleapis.com/upload/drive/v3/files?uploadType=media";
+	std::vector<char> res;
+	Curl curl2;
+	curl2.set_type(Curl::Request_type::put).use_ssl(true).set_url(up_url).\
+		add_header(std::string{ "Authorization: Bearer " } +access_token).add_header("Content-type: application/json");
 
-		Curl curl{};
+	int http = curl2.send(file_name_json.toStyledString(), res);
+	if (http < 200 || http > 299)
+		throw std::runtime_error{ "Rename unsuccessful" };
 
-		for (const auto& i : http_fields)
-			curl.add_header(i);
-		curl.use_ssl(false).set_type(Curl::Request_type::post).set_url(url);
-
-		std::vector<char> response;
-
-		int http_code = curl.send(upload_file_content, response);
-		if (http_code < 200 || http_code > 299)
-			throw std::runtime_error{ "Upload unsuccessfull" };
-
-		std::string file_stats{ response.data() , response.size() };
-		Json::Value file_id_json;
-		Json::Reader reader;
-		reader.parse(file_stats.c_str(), file_id_json);
-		if (file_id_json["id"].asString() == "")
-		{
-			std::cerr << "Something went wrong" << std::endl;
-			throw std::runtime_error{ "Unable to read file id" };
-		}
-		file_id = file_id_json["id"].asString();
-	}
-
-	{ // Rename file block
-
-		std::string up_url = "https://www.googleapis.com/drive/v2/files/";
-		up_url += file_id + "?key=" + client_id;
-
-		Json::Value file_name_json;
-		file_name_json["title"] = file_name;
-
-		std::string access_token = get_access_token(refresh_token, client_id, client_secret);
-
-		std::vector<char> res;
-		Curl curl2;
-		curl2.set_type(Curl::Request_type::put).use_ssl(true).set_url(up_url).\
-			add_header(std::string{ "Authorization: Bearer " } +access_token).add_header("Content-type: application/json");
-
-		int http = curl2.send(file_name_json.toStyledString(), res);
-		if (http < 200 || http > 299)
-			throw std::runtime_error{ "Rename unsuccessful" };
-
-		return true;
-
-	}
 }
+//	---------------------------------------------------------------------------------------------
+std::string upload_file(_In_ const std::string& file_name, _In_ const std::string& refresh_token, _In_ const std::string& client_id, _In_ const std::string& client_secret)
+// Uploads file to drive and returns file id
+{
+	std::ifstream upload_file{ file_name };
+	if (!upload_file.is_open())
+		throw std::runtime_error{ "Bad file name" };
+	std::string upload_file_content((std::istreambuf_iterator<char>(upload_file)),
+		std::istreambuf_iterator<char>());
 
+	std::string access_token = get_access_token(refresh_token, client_id, client_secret);
+
+	std::vector<std::string> http_fields =
+	{
+		"Authorization: Bearer " + access_token,
+		"Content-Type: text/plain",
+		"Content-Length: " + std::to_string(upload_file_content.size()),
+	};
+
+	std::string url = "https://www.googleapis.com/upload/drive/v3/files?uploadType=media";
+
+	Curl curl{};
+
+	for (const auto& i : http_fields)
+		curl.add_header(i);
+	curl.use_ssl(false).set_type(Curl::Request_type::post).set_url(url);
+
+	std::vector<char> response;
+
+	int http_code = curl.send(upload_file_content, response);
+	if (http_code < 200 || http_code > 299)
+		throw std::runtime_error{ "Upload unsuccessfull" };
+
+	std::string file_stats{ response.data() , response.size() };
+	Json::Value file_id_json;
+	Json::Reader reader;
+	reader.parse(file_stats.c_str(), file_id_json);
+	if (file_id_json["id"].asString() == "")
+	{
+		std::cerr << "Something went wrong" << std::endl;
+		throw std::runtime_error{ "Unable to read file id" };
+	}
+	return file_id_json["id"].asString();
+}
+//	---------------------------------------------------------------------------------------------
 int main(int argc, char* argv[])
 try
 {
@@ -241,9 +246,14 @@ try
 	}
 	else // File was dropped on executable
 		file_name = argv[1];
-	if (upload_file(file_name, refresh_token, client_id, client_secret))
-		std::cout << "Upload successfull" << std::endl;
+	
+	std::string file_id = upload_file(file_name, refresh_token, client_id, client_secret);
+	if (!file_id.empty())
+		std::cout << "Upload successful" << std::endl;
 
+	rename_file(file_name, file_id, refresh_token, client_id, client_secret);
+	std::cout << "Rename successful" << std::endl;
+	
 	// Wait for input
 	char c;
 	std::cin >> c;

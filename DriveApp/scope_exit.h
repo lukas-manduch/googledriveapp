@@ -94,6 +94,7 @@ public:
 
 	void Execute() { m_fun(m_arg1); }
 };
+//	-----------------------------------------------------------------------
 template <typename Fun , typename Arg1>
 ScopeExitImpl1<Fun , Arg1> MakeGuard(Fun fun , Arg1 arg)
 {

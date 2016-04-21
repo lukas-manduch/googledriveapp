@@ -34,6 +34,7 @@ Tcp_communicator::Tcp_communicator()
 
 	// Create a SOCKET for connecting to server
 	listen_socket = socket(result->ai_family, result->ai_socktype, result->ai_protocol);
+	
 	ScopeExit addr_info_cleanup = MakeGuard(freeaddrinfo , result);
 	if (listen_socket == INVALID_SOCKET)
 	{
