@@ -34,20 +34,18 @@ Tcp_communicator::Tcp_communicator()
 
 	// Create a SOCKET for connecting to server
 	listen_socket = socket(result->ai_family, result->ai_socktype, result->ai_protocol);
+	ScopeExit addr_info_cleanup = MakeGuard(freeaddrinfo , result);
 	if (listen_socket == INVALID_SOCKET)
 	{
-		freeaddrinfo(result);
 		throw std::exception("Error creating socket failed\n");
 	}
 
 	// Setup the TCP listening socket
 	if (bind(listen_socket, result->ai_addr, (int)result->ai_addrlen) == SOCKET_ERROR)
 	{
-		freeaddrinfo(result);
 		closesocket(listen_socket);
 		throw std::exception("Error binding socket failed\n");
 	}
-	freeaddrinfo(result);
 
     wsa_cleanup.Dismiss();
 }
