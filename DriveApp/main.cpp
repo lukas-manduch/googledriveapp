@@ -8,6 +8,9 @@
 #include "tcp_communicator/tcp_communicator.h"
 #include "curl_cpp/curl.h"
 
+#include <msclr/marshal_cppstd.h>
+
+
 // input is json file from Google API
 // https://developers.google.com/identity/protocols/OAuth2InstalledApp
 // https://developers.google.com/drive/v3/web/about-auth
@@ -227,11 +230,44 @@ upload_file(
 	return file_id_json["id"].asString();
 }
 //	---------------------------------------------------------------------------------------------
+
+void ProcessDirectory(System::String^ targetDirectory , const std::string& refresh_token , const std::string& client_id ,const std::string& client_secret )
+{
+	using namespace System;
+	using namespace System::IO;
+	using namespace System::Collections;
+	// Process the list of files found in the directory.
+	array<String^>^fileEntries = Directory::GetFiles(targetDirectory);
+	IEnumerator^ files = fileEntries->GetEnumerator();
+	while (files->MoveNext())
+	{
+		String^ fileName = safe_cast<String^>(files->Current);
+		std::string file_name = msclr::interop::marshal_as<std::string>(fileName);
+		std::string file_id = upload_file(file_name, refresh_token, client_id, client_secret);
+		if (!file_id.empty())
+			std::cout << "Upload successful: " << file_name << std::endl;
+
+		rename_file(file_name, file_id, refresh_token, client_id, client_secret);
+		std::cout << "Rename successful: " << file_name << std::endl;
+	}
+
+
+	// Recurse into subdirectories of this directory.
+	array<String^>^subdirectoryEntries = Directory::GetDirectories(targetDirectory);
+	IEnumerator^ dirs = subdirectoryEntries->GetEnumerator();
+	while (dirs->MoveNext())
+	{
+		String^ subdirectory = safe_cast<String^>(dirs->Current);
+		ProcessDirectory(subdirectory , refresh_token , client_id , client_secret);
+	}
+}
+//	---------------------------------------------------------------------------------------------
 int main(int argc, char* argv[])
 try
 {
 	if (argc != 2 && argc != 1)
 		return 1;
+
 
 	std::string this_dir(argv[0]);
 	this_dir.erase(this_dir.rfind('\\') + 1, std::string::npos);
@@ -259,14 +295,24 @@ try
 	}
 	else // File was dropped on executable
 		file_name = argv[1];
-	
-	std::string file_id = upload_file(file_name, refresh_token, client_id, client_secret);
-	if (!file_id.empty())
-		std::cout << "Upload successful" << std::endl;
+	System::String^ system_file_name = gcnew System::String(file_name.c_str());
+	if ( System::IO::File::Exists(system_file_name) )
+	{
+		std::string file_id = upload_file(file_name, refresh_token, client_id, client_secret);
+		if (!file_id.empty())
+			std::cout << "Upload successful" << std::endl;
 
-	rename_file(file_name, file_id, refresh_token, client_id, client_secret);
-	std::cout << "Rename successful" << std::endl;
-	
+		rename_file(file_name, file_id, refresh_token, client_id, client_secret);
+		std::cout << "Rename successful" << std::endl;
+	}
+	else if (System::IO::Directory::Exists(system_file_name))
+	{
+		ProcessDirectory(system_file_name, refresh_token, client_id, client_secret);
+	}
+	else
+	{
+		std::cout << "Invalid name or directory: " << file_name << std::endl;
+	}
 	// Wait for input
 	char c;
 	std::cin >> c;
