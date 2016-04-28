@@ -231,7 +231,7 @@ upload_file(
 }
 //	---------------------------------------------------------------------------------------------
 
-void ProcessDirectory(System::String^ targetDirectory , const std::string& refresh_token , const std::string& client_id ,const std::string& client_secret )
+void ProcessDirectory( _In_ System::String^ targetDirectory , _In_ const std::string& refresh_token ,_In_ const std::string& client_id , _In_ const std::string& client_secret )
 {
 	using namespace System;
 	using namespace System::IO;
@@ -245,10 +245,12 @@ void ProcessDirectory(System::String^ targetDirectory , const std::string& refre
 		std::string file_name = msclr::interop::marshal_as<std::string>(fileName);
 		std::string file_id = upload_file(file_name, refresh_token, client_id, client_secret);
 		if (!file_id.empty())
+		{
 			std::cout << "Upload successful: " << file_name << std::endl;
 
-		rename_file(file_name, file_id, refresh_token, client_id, client_secret);
-		std::cout << "Rename successful: " << file_name << std::endl;
+			rename_file(file_name, file_id, refresh_token, client_id, client_secret);
+			std::cout << "Rename successful: " << file_name << std::endl;
+		}
 	}
 
 
@@ -276,7 +278,7 @@ try
 	Json::Reader reader;
 	Json::Value client_secret_json;
 
-	if (!reader.parse(std::ifstream("client_secret.json"), client_secret_json))
+	if (!reader.parse(std::ifstream(this_dir + "client_secret.json"), client_secret_json))
 		throw std::runtime_error{ "invalid client_secret.json" };
 
 	std::string client_id = client_secret_json["installed"]["client_id"].asString();
@@ -300,10 +302,12 @@ try
 	{
 		std::string file_id = upload_file(file_name, refresh_token, client_id, client_secret);
 		if (!file_id.empty())
+		{
 			std::cout << "Upload successful" << std::endl;
 
-		rename_file(file_name, file_id, refresh_token, client_id, client_secret);
-		std::cout << "Rename successful" << std::endl;
+			rename_file(file_name, file_id, refresh_token, client_id, client_secret);
+			std::cout << "Rename successful" << std::endl;
+		}
 	}
 	else if (System::IO::Directory::Exists(system_file_name))
 	{
