@@ -179,6 +179,49 @@ rename_file(
 		throw std::runtime_error{ "Rename unsuccessful" };
 
 }
+std::string
+create_folder(
+	_In_ const std::string& folder_name,
+	_In_ const std::string& refresh_token,
+	_In_ const std::string& client_id,
+	_In_ const std::string& client_secret
+)
+{
+	std::string access_token = get_access_token(refresh_token, client_id, client_secret);
+	
+	Json::Value folder_json;
+	folder_json["name"] = folder_name;
+	folder_json["mimeType"] = "application/vnd.google-apps.folder";
+
+	std::vector<std::string> http_fields =
+	{
+		"Authorization: Bearer " + access_token,
+		"Content-Type: application/json",
+		"Content-Length: " + std::to_string( folder_json.toStyledString().size() ),
+	};
+
+	Curl curl{};
+	curl.set_url("https://www.googleapis.com/drive/v3/files").set_type(Curl::Request_type::post).use_ssl(true);
+	for (const auto& i : http_fields)
+		curl.add_header(i);
+
+	std::vector<char> response;
+	int http_code = curl.send(folder_json.toStyledString() , response);
+	if (http_code < 200 || http_code > 299)
+		throw std::runtime_error{ "Directory create unsuccessfull" };
+
+	std::string folder_stats{ response.data() , response.size() };
+	Json::Value folder_id_json;
+	Json::Reader reader;
+	reader.parse(folder_stats.c_str(), folder_id_json);
+	if (folder_id_json["id"].asString() == "")
+	{
+		std::cerr << "Something went wrong" << std::endl;
+		throw std::runtime_error{ "Unable to read folder id" };
+	}
+	return folder_id_json["id"].asString();
+
+}
 //	---------------------------------------------------------------------------------------------
 std::string 
 upload_file(
@@ -236,6 +279,12 @@ void ProcessDirectory( _In_ System::String^ targetDirectory , _In_ const std::st
 	using namespace System;
 	using namespace System::IO;
 	using namespace System::Collections;
+
+	// Create folder in drive
+	std::string folder_name = msclr::interop::marshal_as<std::string>(targetDirectory);
+	create_folder(folder_name, refresh_token, client_id, client_secret);
+
+
 	// Process the list of files found in the directory.
 	array<String^>^fileEntries = Directory::GetFiles(targetDirectory);
 	IEnumerator^ files = fileEntries->GetEnumerator();
