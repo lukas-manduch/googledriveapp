@@ -2,14 +2,15 @@
 #include <iostream>
 #include <vector>
 #include <regex>
+#include <filesystem>
+#include <codecvt>
 
 #include <curl/curl.h>
 #include "json/json.h"
 #include "tcp_communicator/tcp_communicator.h"
 #include "curl_cpp/curl.h"
 
-#include <msclr/marshal_cppstd.h>
-
+namespace fs = std::experimental::filesystem;
 
 // input is json file from Google API
 // https://developers.google.com/identity/protocols/OAuth2InstalledApp
@@ -274,55 +275,50 @@ upload_file(
 }
 //	---------------------------------------------------------------------------------------------
 
-void ProcessDirectory( _In_ System::String^ targetDirectory , _In_ const std::string& refresh_token ,_In_ const std::string& client_id , _In_ const std::string& client_secret )
+void ProcessDirectory( _In_ const std::string& target_directory , _In_ const std::string& refresh_token ,_In_ const std::string& client_id , _In_ const std::string& client_secret )
 {
-	using namespace System;
-	using namespace System::IO;
-	using namespace System::Collections;
 
 	// Create folder in drive
-	std::string folder_name = msclr::interop::marshal_as<std::string>(targetDirectory);
-	create_folder(folder_name, refresh_token, client_id, client_secret);
+	create_folder(target_directory, refresh_token, client_id, client_secret);
 
 
 	// Process the list of files found in the directory.
-	array<String^>^fileEntries = Directory::GetFiles(targetDirectory);
-	IEnumerator^ files = fileEntries->GetEnumerator();
-	while (files->MoveNext())
-	{
-		String^ fileName = safe_cast<String^>(files->Current);
-		std::string file_name = msclr::interop::marshal_as<std::string>(fileName);
-		std::string file_id = upload_file(file_name, refresh_token, client_id, client_secret);
-		if (!file_id.empty())
-		{
-			std::cout << "Upload successful: " << file_name << std::endl;
+    for (const auto& p : fs::directory_iterator(target_directory))
+    {
+        if (p.status().type() == fs::file_type::directory)
+        {
+            ProcessDirectory(p.path().string(), refresh_token, client_id, client_secret);
+        }
+        else
+        {
+            std::string file_name = p.path().string();
+            std::string file_id = upload_file(file_name, refresh_token, client_id, client_secret);
+            if (!file_id.empty())
+            {
+                std::cout << "Upload successful: " << file_name << std::endl;
 
-			rename_file(file_name, file_id, refresh_token, client_id, client_secret);
-			std::cout << "Rename successful: " << file_name << std::endl;
-		}
-	}
-
-
-	// Recurse into subdirectories of this directory.
-	array<String^>^subdirectoryEntries = Directory::GetDirectories(targetDirectory);
-	IEnumerator^ dirs = subdirectoryEntries->GetEnumerator();
-	while (dirs->MoveNext())
-	{
-		String^ subdirectory = safe_cast<String^>(dirs->Current);
-		ProcessDirectory(subdirectory , refresh_token , client_id , client_secret);
-	}
+                rename_file(file_name, file_id, refresh_token, client_id, client_secret);
+                std::cout << "Rename successful: " << file_name << std::endl;
+            }
+        }
+    }
 }
+
+
 //	---------------------------------------------------------------------------------------------
-int main(int argc, char* argv[])
+int wmain(int argc, wchar_t* argv[])
 try
 {
+    static int i = 1;
+    while (i) { }
+
 	if (argc != 2 && argc != 1)
 		return 1;
 
-
-	std::string this_dir(argv[0]);
+    std::wstring_convert<std::codecvt_utf8<wchar_t>> utf8cvt;
+    
+    std::string this_dir = utf8cvt.to_bytes(argv[0]);
 	this_dir.erase(this_dir.rfind('\\') + 1, std::string::npos);
-
 
 	Json::Reader reader;
 	Json::Value client_secret_json;
@@ -345,27 +341,34 @@ try
 		getline(std::cin, file_name);
 	}
 	else // File was dropped on executable
-		file_name = argv[1];
-	System::String^ system_file_name = gcnew System::String(file_name.c_str());
-	if ( System::IO::File::Exists(system_file_name) )
-	{
-		std::string file_id = upload_file(file_name, refresh_token, client_id, client_secret);
-		if (!file_id.empty())
-		{
-			std::cout << "Upload successful" << std::endl;
+		file_name = utf8cvt.to_bytes(argv[1]);
 
-			rename_file(file_name, file_id, refresh_token, client_id, client_secret);
-			std::cout << "Rename successful" << std::endl;
-		}
-	}
-	else if (System::IO::Directory::Exists(system_file_name))
-	{
-		ProcessDirectory(system_file_name, refresh_token, client_id, client_secret);
-	}
-	else
-	{
-		std::cout << "Invalid name or directory: " << file_name << std::endl;
-	}
+    switch (fs::status(fs::u8path(file_name)).type())
+    {
+        case fs::file_type::regular:
+        {
+            std::string file_id = upload_file(file_name, refresh_token, client_id, client_secret);
+            if (!file_id.empty())
+            {
+                std::cout << "Upload successful" << std::endl;
+
+                rename_file(file_name, file_id, refresh_token, client_id, client_secret);
+                std::cout << "Rename successful" << std::endl;
+            }
+            break;
+        }
+        case fs::file_type::directory:
+        {
+            ProcessDirectory(file_name, refresh_token, client_id, client_secret);
+            break;
+        }
+        default:
+        {
+            std::cout << "Invalid name or directory: " << file_name << std::endl;
+            break;
+        }
+    }
+
 	// Wait for input
 	char c;
 	std::cin >> c;
