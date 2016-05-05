@@ -13,6 +13,9 @@
     <Filter Include="tcp_communicator">
       <UniqueIdentifier>{020d1bc7-13b9-45e7-894c-918ea68f0acf}</UniqueIdentifier>
     </Filter>
+    <Filter Include="cloud_uploader">
+      <UniqueIdentifier>{1835bffe-104c-4dcd-a70a-23e7294a4f66}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="json\json.h">
@@ -55,6 +58,12 @@
       <Filter>tcp_communicator</Filter>
     </ClInclude>
     <ClInclude Include="scope_exit.h" />
+    <ClInclude Include="cloud_uploader\cloud_uploader.h">
+      <Filter>cloud_uploader</Filter>
+    </ClInclude>
+    <ClInclude Include="cloud_uploader\google_drive_uploader.h">
+      <Filter>cloud_uploader</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="json\jsoncpp.cpp">
@@ -66,6 +75,9 @@
     </ClCompile>
     <ClCompile Include="tcp_communicator\tcp_communicator.cpp">
       <Filter>tcp_communicator</Filter>
+    </ClCompile>
+    <ClCompile Include="cloud_uploader\google_drive_uploader.cpp">
+      <Filter>cloud_uploader</Filter>
     </ClCompile>
   </ItemGroup>
 </Project>

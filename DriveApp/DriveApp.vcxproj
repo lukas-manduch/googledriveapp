@@ -11,6 +11,8 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="cloud_uploader\cloud_uploader.h" />
+    <ClInclude Include="cloud_uploader\google_drive_uploader.h" />
     <ClInclude Include="curl_cpp\curl.h" />
     <ClInclude Include="json\json-forwards.h" />
     <ClInclude Include="json\json.h" />
@@ -27,6 +29,7 @@
     <ClInclude Include="tcp_communicator\tcp_communicator.h" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="cloud_uploader\google_drive_uploader.cpp" />
     <ClCompile Include="curl_cpp\curl.cpp" />
     <ClCompile Include="json\jsoncpp.cpp" />
     <ClCompile Include="main.cpp" />
