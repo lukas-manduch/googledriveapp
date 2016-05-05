@@ -88,43 +88,7 @@ Json::Value Authenticate(_In_ const std::string& authorization_code, _In_ const 
 	reader.parse(&response[0], &response[0] + response.size(), ret_val);
 	return ret_val;
 }
-//	---------------------------------------------------------------------------------------------
-Json::Value RefreshToken(_In_ const std::string& refresh_token, _In_ const std::string& client_id, _In_ const std::string& client_secret)
-// Use refresh token to get access token
-{
-	std::stringstream post;
-	post << "client_id=" << client_id << "&"
-		<< "client_secret=" << client_secret << "&"
-		<< "refresh_token=" << refresh_token << "&"
-		<< "grant_type=refresh_token";
 
-	std::string post_str = post.str();
-	std::string token_uri = "https://www.googleapis.com/oauth2/v4/token";
-
-
-	Curl curl{};
-	curl.use_ssl(false).set_type(Curl::Request_type::post).set_url(token_uri);
-
-	std::vector<char> response;
-	int http_code = curl.send(post.str(), response);
-	if (http_code < 200 || http_code > 299)
-		throw std::runtime_error{ "Unable to authenticate" };
-
-	Json::Reader reader;
-
-	Json::Value ret_val;
-	reader.parse(&response[0], &response[0] + response.size(), ret_val);
-	return ret_val;
-}
-//	---------------------------------------------------------------------------------------------
-std::string get_access_token(_In_ const std::string refresh_token, _In_ const std::string client_id, _In_ const std::string client_secret)
-{
-	Json::Value refresh_token_reply = RefreshToken(refresh_token, client_id, client_secret);
-	std::string access_token = refresh_token_reply["access_token"].asString();
-	if (access_token == "")
-		throw std::runtime_error{ "Unable to get access_token" };
-	return access_token;
-}
 //	---------------------------------------------------------------------------------------------
 std::string get_refresh_token(_In_ const std::string& file_name, _In_ const std::string& auth_url, _In_ const std::string& client_id, _In_ const std::string& client_secret)
 {
@@ -136,8 +100,8 @@ std::string get_refresh_token(_In_ const std::string& file_name, _In_ const std:
 		if (settings_json["refresh_token"].isString())
 		{
 			std::string  refresh_token = settings_json["refresh_token"].asString();
-			std::string access_token = get_access_token(refresh_token, client_id, client_secret);
-			return refresh_token;
+			if ( Google_drive_uploader::is_refresh_token_valid(refresh_token, client_id, client_secret) )
+				return refresh_token;
 		}
 		throw std::runtime_error{ "" }; // Go to catch
 	}
@@ -152,159 +116,6 @@ std::string get_refresh_token(_In_ const std::string& file_name, _In_ const std:
 	}
 }
 //	---------------------------------------------------------------------------------------------
-void 
-rename_file(
-	_In_ const std::string& file_name, 
-	_In_ const std::string& file_id , 
-	_In_ const std::string& refresh_token, 
-	_In_ const std::string& client_id, 
-	_In_ const std::string& client_secret
-)
-// Rename file identified by file_id to file_name
-{
-	std::string up_url = "https://www.googleapis.com/drive/v2/files/";
-	up_url += file_id + "?key=" + client_id;
-
-	Json::Value file_name_json;
-	file_name_json["title"] = file_name;
-
-	std::string access_token = get_access_token(refresh_token, client_id, client_secret);
-
-	std::vector<char> res;
-	Curl curl2;
-	curl2.set_type(Curl::Request_type::put).use_ssl(true).set_url(up_url).\
-		add_header(std::string{ "Authorization: Bearer " } +access_token).add_header("Content-type: application/json");
-
-	int http = curl2.send(file_name_json.toStyledString(), res);
-	if (http < 200 || http > 299)
-		throw std::runtime_error{ "Rename unsuccessful" };
-
-}
-std::string
-create_folder(
-	_In_ const std::string& folder_name,
-	_In_ const std::string& refresh_token,
-	_In_ const std::string& client_id,
-	_In_ const std::string& client_secret
-)
-{
-	std::string access_token = get_access_token(refresh_token, client_id, client_secret);
-	
-	Json::Value folder_json;
-	folder_json["name"] = folder_name;
-	folder_json["mimeType"] = "application/vnd.google-apps.folder";
-
-	std::vector<std::string> http_fields =
-	{
-		"Authorization: Bearer " + access_token,
-		"Content-Type: application/json",
-		"Content-Length: " + std::to_string( folder_json.toStyledString().size() ),
-	};
-
-	Curl curl{};
-	curl.set_url("https://www.googleapis.com/drive/v3/files").set_type(Curl::Request_type::post).use_ssl(true);
-	for (const auto& i : http_fields)
-		curl.add_header(i);
-
-	std::vector<char> response;
-	int http_code = curl.send(folder_json.toStyledString() , response);
-	if (http_code < 200 || http_code > 299)
-		throw std::runtime_error{ "Directory create unsuccessfull" };
-
-	std::string folder_stats{ response.data() , response.size() };
-	Json::Value folder_id_json;
-	Json::Reader reader;
-	reader.parse(folder_stats.c_str(), folder_id_json);
-	if (folder_id_json["id"].asString() == "")
-	{
-		std::cerr << "Something went wrong" << std::endl;
-		throw std::runtime_error{ "Unable to read folder id" };
-	}
-	return folder_id_json["id"].asString();
-
-}
-//	---------------------------------------------------------------------------------------------
-std::string 
-upload_file(
-	_In_ const std::string& file_name,
-	_In_ const std::string& refresh_token, 
-	_In_ const std::string& client_id, 
-	_In_ const std::string& client_secret
-)
-// Uploads file to drive and returns file id
-{
-	std::ifstream upload_file{ file_name };
-	if (!upload_file.is_open())
-		throw std::runtime_error{ "Bad file name" };
-	std::string upload_file_content((std::istreambuf_iterator<char>(upload_file)),
-		std::istreambuf_iterator<char>());
-
-	std::string access_token = get_access_token(refresh_token, client_id, client_secret);
-
-	std::vector<std::string> http_fields =
-	{
-		"Authorization: Bearer " + access_token,
-		"Content-Type: text/plain",
-		"Content-Length: " + std::to_string(upload_file_content.size()),
-	};
-
-	std::string url = "https://www.googleapis.com/upload/drive/v3/files?uploadType=media";
-
-	Curl curl{};
-
-	for (const auto& i : http_fields)
-		curl.add_header(i);
-	curl.use_ssl(false).set_type(Curl::Request_type::post).set_url(url);
-
-	std::vector<char> response;
-
-	int http_code = curl.send(upload_file_content, response);
-	if (http_code < 200 || http_code > 299)
-		throw std::runtime_error{ "Upload unsuccessfull" };
-
-	std::string file_stats{ response.data() , response.size() };
-	Json::Value file_id_json;
-	Json::Reader reader;
-	reader.parse(file_stats.c_str(), file_id_json);
-	if (file_id_json["id"].asString() == "")
-	{
-		std::cerr << "Something went wrong" << std::endl;
-		throw std::runtime_error{ "Unable to read file id" };
-	}
-	return file_id_json["id"].asString();
-}
-//	---------------------------------------------------------------------------------------------
-
-void ProcessDirectory( _In_ const std::string& target_directory , _In_ const std::string& refresh_token ,_In_ const std::string& client_id , _In_ const std::string& client_secret )
-{
-
-	// Create folder in drive
-	create_folder(target_directory, refresh_token, client_id, client_secret);
-
-
-	// Process the list of files found in the directory.
-    for (const auto& p : fs::directory_iterator(target_directory))
-    {
-        if (p.status().type() == fs::file_type::directory)
-        {
-            ProcessDirectory(p.path().string(), refresh_token, client_id, client_secret);
-        }
-        else
-        {
-            std::string file_name = p.path().string();
-            std::string file_id = upload_file(file_name, refresh_token, client_id, client_secret);
-            if (!file_id.empty())
-            {
-                std::cout << "Upload successful: " << file_name << std::endl;
-
-                rename_file(file_name, file_id, refresh_token, client_id, client_secret);
-                std::cout << "Rename successful: " << file_name << std::endl;
-            }
-        }
-    }
-}
-
-
 //	---------------------------------------------------------------------------------------------
 int wmain(int argc, wchar_t* argv[])
 try
@@ -329,7 +140,9 @@ try
 
 	std::string refresh_token = get_refresh_token(this_dir + "settings.json", auth_url, client_id, client_secret);
 
-	std::string access_token = get_access_token(refresh_token, client_id, client_secret);
+
+
+	// ------------------------------------------------------------------
 
 	Google_drive_uploader gdu{ refresh_token , client_id , client_secret };
 
