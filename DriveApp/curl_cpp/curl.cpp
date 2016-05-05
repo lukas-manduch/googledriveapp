@@ -1,61 +1,67 @@
 #include <curl/curl.h>
 #include <iostream>
+#include <stdexcept>
+
 #include "curl.h"
 
 Curl::Curl()
 {
-	curl = curl_easy_init();
+	m_curl = curl_easy_init();
+    if (m_curl == nullptr)
+    {
+        throw std::runtime_error("Unable to initialize curl.");
+    }
 }
 
 Curl::~Curl()
 {
-	curl_easy_cleanup(curl);
-	if (list != nullptr)
-		curl_slist_free_all(list);
+	curl_easy_cleanup(m_curl);
+	if (m_list != nullptr)
+		curl_slist_free_all(m_list);
 }
 
 Curl & Curl::set_type(Curl::Request_type type)
 {
-	curl_easy_setopt(curl, CURLOPT_CUSTOMREQUEST, get_method(type).c_str());
+	curl_easy_setopt(m_curl, CURLOPT_CUSTOMREQUEST, get_method(type).c_str());
 	return *this;
 }
 
 Curl & Curl::set_url( _In_ const std::string & url)
 {
-	curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
+	curl_easy_setopt(m_curl, CURLOPT_URL, url.c_str());
 	return *this;
 }
 
 Curl & Curl::use_ssl( _In_ bool ssl)
 {
-	curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, ssl);
+	curl_easy_setopt(m_curl, CURLOPT_SSL_VERIFYPEER, ssl);
 	return *this;
 }
 
 Curl & Curl::add_header( _In_ const std::string & header)
 {
-	list = curl_slist_append(list, header.c_str());
+	m_list = curl_slist_append(m_list, header.c_str());
 	return *this;
 }
 
-unsigned int Curl::send(_In_ const std::string& message, _Out_ std::vector<char>& response)
+long Curl::send(_In_ const std::string& message, _Out_ std::vector<char>& response)
 {
 	if (m_used)
 		throw std::runtime_error{"Curl cannot be reused"};
 	m_used = true;
 
-	if (list != nullptr)
-		curl_easy_setopt(curl, CURLOPT_HTTPHEADER, list);
+	if (m_list != nullptr)
+		curl_easy_setopt(m_curl, CURLOPT_HTTPHEADER, m_list);
 	
-	curl_easy_setopt(curl, CURLOPT_POSTFIELDS, message.c_str());
-	curl_easy_setopt(curl, CURLOPT_POSTFIELDSIZE, message.size());
-	curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, Curl::WriteVectorCallback);
-	curl_easy_setopt(curl, CURLOPT_WRITEDATA, (void *)&response);
-
-	if (curl_easy_perform(curl) != 0)
+	curl_easy_setopt(m_curl, CURLOPT_POSTFIELDS, message.c_str());
+	curl_easy_setopt(m_curl, CURLOPT_POSTFIELDSIZE, message.size());
+	curl_easy_setopt(m_curl, CURLOPT_WRITEFUNCTION, Curl::WriteVectorCallback);
+	curl_easy_setopt(m_curl, CURLOPT_WRITEDATA, (void *)&response);
+    
+	if (curl_easy_perform(m_curl) != 0)
 		throw std::exception{ "Error while performing request" };
-	int http_code;
-	curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &http_code);
+	long http_code;
+	curl_easy_getinfo(m_curl, CURLINFO_RESPONSE_CODE, &http_code);
 	return http_code;
 }
 
@@ -73,7 +79,7 @@ size_t Curl::WriteVectorCallback(_In_ void * ptr, _In_ size_t size, _In_ size_t 
 	return size*count;
 }
 
-const std::string Curl::get_method(Request_type type)
+const std::string Curl::get_method(Request_type type) const
 {
 	switch (type)
 	{
