@@ -9,6 +9,7 @@
 #include "json/json.h"
 #include "tcp_communicator/tcp_communicator.h"
 #include "curl_cpp/curl.h"
+#include "cloud_uploader/google_drive_uploader.h"
 
 namespace fs = std::experimental::filesystem;
 
@@ -127,7 +128,6 @@ std::string get_access_token(_In_ const std::string refresh_token, _In_ const st
 //	---------------------------------------------------------------------------------------------
 std::string get_refresh_token(_In_ const std::string& file_name, _In_ const std::string& auth_url, _In_ const std::string& client_id, _In_ const std::string& client_secret)
 {
-	
 	try // Try to use refresh token from file_name
 	{
 		Json::Reader reader;
@@ -309,9 +309,6 @@ void ProcessDirectory( _In_ const std::string& target_directory , _In_ const std
 int wmain(int argc, wchar_t* argv[])
 try
 {
-    static int i = 1;
-    while (i) { }
-
 	if (argc != 2 && argc != 1)
 		return 1;
 
@@ -334,41 +331,41 @@ try
 
 	std::string access_token = get_access_token(refresh_token, client_id, client_secret);
 
-	std::string file_name;
+	Google_drive_uploader gdu{ refresh_token , client_id , client_secret };
+
+	std::wstring file_name;
+	
 	if (argc == 1) // Get name from input
 	{
 		std::cout << "Name of file:" << std::endl;
-		getline(std::cin, file_name);
+		std::wcin >> file_name;
 	}
 	else // File was dropped on executable
-		file_name = utf8cvt.to_bytes(argv[1]);
-
-    switch (fs::status(fs::u8path(file_name)).type())
+		file_name = argv[1];
+	
+    switch (fs::status(file_name).type())
     {
         case fs::file_type::regular:
         {
-            std::string file_id = upload_file(file_name, refresh_token, client_id, client_secret);
-            if (!file_id.empty())
-            {
-                std::cout << "Upload successful" << std::endl;
-
-                rename_file(file_name, file_id, refresh_token, client_id, client_secret);
-                std::cout << "Rename successful" << std::endl;
-            }
+			if (gdu.upload_file(file_name, Cloud_uploader::File_type::text))
+			{
+				std::cout << "Upload file successful" << std::endl;
+			}
             break;
         }
         case fs::file_type::directory:
         {
-            ProcessDirectory(file_name, refresh_token, client_id, client_secret);
+			if ( gdu.upload_folder(file_name) )
+				std::cout << "Upload folder successful" << std::endl;
             break;
         }
         default:
         {
-            std::cout << "Invalid name or directory: " << file_name << std::endl;
+            std::cout << "Invalid name or directory: " <<  std::endl;
             break;
         }
     }
-
+	
 	// Wait for input
 	char c;
 	std::cin >> c;
